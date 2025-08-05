@@ -174,7 +174,13 @@ Each time a tutorial is assigned, I will provide the one-liner code needed to op
 To access tutorials for additional content or assignments in our course, you will need to download my package from GitHub. The package is called `r4psych.tutorials`. Always install the latest version before launching a new tutorial or assignment module. To install, run: 
 
 ```{r, eval=F}
-learnr::run_tutorial("rstudio", package = "tutorial.helpers")
+remotes::install_github("luningham-lab/r4psych.tutorials")
+```
+
+Now you can load tutorials from this package (again, code will be provided):
+
+```{r, eval=F}
+learnr::run_tutorial("module1", package = "r4psych.tutorials")
 ```
 
 ```{r download-answers, child=system.file("child_documents/download_answers.Rmd", package = "tutorial.helpers"),echo=F}
