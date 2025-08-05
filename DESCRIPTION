@@ -1,0 +1,15 @@
+Package: r4psych.tutorials
+Title: LearnR Tutorials for R for Psychology
+Version: 0.0.0.9000
+Author: Justin M. Luningham
+Maintainer: Justin M. Luningham <j.luningham@tcu.edu>
+Imports:
+    learnr,
+    tutorial.helpers,
+    r4ds.tutorials,
+    tidyverse
+Description: Minimal package to deliver interactive learnr tutorials.
+License: MIT
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 7.3.2

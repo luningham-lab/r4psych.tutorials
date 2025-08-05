@@ -1,0 +1,181 @@
+---
+title: "Module 1: Introduction to R"
+tutorial:
+  id: "module1"
+  name: "Module 1"
+output: 
+  learnr::tutorial:
+    progressive: true
+    allow_skip: true
+runtime: shiny_prerendered
+description: "Basic Introduction to `R` Environment and Tutorial Access"
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+library(tutorial.helpers)
+options(repos = c(CRAN = "https://cran.rstudio.com"))
+```
+
+```{r info-section, child=system.file("child_documents/info_section.Rmd", package = "tutorial.helpers"),echo=F}
+```
+
+```{r copy-code-chunk, child=system.file("child_documents/copy_button.Rmd", package = "tutorial.helpers")}
+```
+
+## Introduction
+
+In this tutorial, we will introduce some of the basics regarding `R` code and the `R` environment. We will also explain how to access and run tutorials for this class, as well as externally created tutorials that accompany the text *R for Data Science (2e)*. As a reminder, the book is available at this link [here](https://r4ds.hadley.nz).
+
+`R` certainly has a learning curve to it, and it can be more complicated than other programs. This is because it is also very flexible and adaptable. `R` can accomplish complex and tedious computations in a few lines of code, but the tradeoff is that our code must be very precise. 
+
+In the `R_Setup` tutorial, we learned about the general form of functions:
+
+```{r,function1, eval=F}
+functionName(argument1 = value1, argument2 = value2, and so on)
+```
+
+and we learned two very important functions: `install.packages()` and `library()`.
+
+### Exercise 1
+
+To reinforce what we've learned, let's load the `tidyverse` package below.
+
+```{r load-library, exercise=TRUE}
+
+```
+
+```{r load-library-hint-1, eval = FALSE}
+library(...)
+```
+
+```{r load-library-test, include = FALSE}
+library(tidyverse)
+```
+
+###
+
+We will install and use many different packages throughout the semester. Let's install a new one now called `r4ds.tutorials`. Complete the text below: 
+
+```{r install-package, exercise=TRUE}
+
+```
+
+```{r install-package-hint-1, eval = FALSE}
+install.packages("pkg_name_must_be_in_quotes")
+```
+
+```{r install-package-test, include = FALSE}
+install.packages("r4ds.tutorials")
+```
+
+###
+
+We will rely on this package extensively, especially in the early stages of the course. This package was written and recently distributed by David Kane:
+
+Kane D (2025). r4ds.tutorials: Tutorials for "R for Data Science". R package version 0.3.2.9003, https://ppbds.github.io/r4ds.tutorials/.
+
+## `R` and RStudio Basics
+
+Rstudio includes 4 windows:
+
+- **The console** is where code is executed. Here, input and output are shown, and code can be written and executed directly
+- **script** or syntax editor. Here we write longer lines of code and then send all or part of the script to the console to run it.
+- The RStudio **Environment** which shows available data, saved objects, functions, script history, and **includes a tutorial tab**
+    - Environment also includes `Import Dataset` button, a point-and-click convenience function for reading in data
+- **utility** pane, which can show plots, tables, help windows, and file paths
+
+###
+
+When performing data analysis in `R`, we often need to create longer series of codes with multiple types of functions and multiple things (e.g., variables) that we perform those functions on. Thankfully, `R` is an object-oriented coding language, meaning we can create placeholders called **"objects"** that store data, functions, or even the result of functions. 
+
+To create an object, we use the *assignment* operator, `<-`. The assignments have the form of 
+
+```{r, eval=F}
+object <- value
+```
+
+Here is an example. In the code chunk below, type `8 + 5` and run code. This is equivalent to running this math once in the `R` console. 
+
+```{r math1, exercise=TRUE}
+
+```
+
+
+```{r math1-hint-1, eval=F}
+8 + 5
+```
+###
+
+The result of the function (the `+` is a math function) is printed in the console; however, if we wanted to do the calculation a second time, we'd have to re-type `8 + 5`. Instead, we can assign the number 13 to an object:
+
+```{r, object1, exercise=T}
+thirteen <- 13
+```
+
+(be sure to hit "Run Code")
+###
+
+Now if we call this object in the console or by running code, it will output what is stored in the object - namely, the number 13.
+
+```{r, object2, exercise=T}
+thirteen
+```
+###
+
+We can also assign the result of a function to an object. 
+
+
+```{r math2, exercise=TRUE}
+thirteen <- 8 + 5
+thirteen
+```
+
+To make a short story long, what's happening above is that `R` recognizes `8` and `5` as `numeric` objects, and the `+` is a function that performs addition to numeric objects. The result is the number thirteen, which is saved in the assigned object `thirteen`. This is why it does not simply print out `8 + 5`. 
+###
+
+`R` is very sensitive to the type of variable or input that it is receiving. The most common types are `numeric` (also called `double` or `dbl`), `factor` or `fct`, and `character` or `chr`. For example, we can tell `R` that the variable is a character by using quotations. Run the following to see the difference: 
+
+```{r math3, exercise=TRUE}
+thirteen <- "8 + 5"
+thirteen
+```
+
+We will cover variable types and some of these coding quirks extensively throughout the semester. 
+
+## Accessing Tutorials
+
+As mentioned, we will use tutorial modules like this one as the bulk of our content throughout the semester. There are a suite of pre-built tutorials in the `r4ds.tutorials` package and the `learnr` package. Additionally, I will create tutorials that can be accessed through a custom `R` package shared through GitHub. First, let's install some packages needed to access all of these sources. 
+
+Be sure to type or copy/paste this code onto your local RStudio console and make sure it runs. 
+
+```{r, eval=F}
+install.packages("learnr")
+install.packages("remotes")
+install.packages("tutorial.helpers")
+#install.packages(r4ds.tutorials) already completed previously
+```
+
+Typically, the tutorial scripts will also load any necessary packages, but it is useful to have all packages installed locally, just in case. 
+
+###
+
+To launch a tutorial on your own computer (laptop or lab PC), we will use a function from `learnr` that is called `run_tutorial()`. In this function, you will provide the name of the tutorial and the name of associated package. Here is an example: 
+
+```{r, eval=F}
+learnr::run_tutorial("rstudio", package = "tutorial.helpers")
+```
+
+The `rstudio` tutorial above is the next module that you will go through. After `learnr` and `tutorial.helpers` are installed, you can run that line above to launch the tutorial in an RStudio/web browser window. 
+Each time a tutorial is assigned, I will provide the one-liner code needed to open it. 
+
+###
+
+To access tutorials for additional content or assignments in our course, you will need to download my package from GitHub. The package is called `r4psych.tutorials`. Always install the latest version before launching a new tutorial or assignment module. To install, run: 
+
+```{r, eval=F}
+learnr::run_tutorial("rstudio", package = "tutorial.helpers")
+```
+
+```{r download-answers, child=system.file("child_documents/download_answers.Rmd", package = "tutorial.helpers"),echo=F}
+```
