@@ -1,0 +1,160 @@
+---
+title: 'Exercise 1: Ch1 of "Statistical Inference via Data Science"'
+author: "Justin Luningham"
+tutorial:
+  id: "exercise1"
+  name: "Exercise 1"
+output: 
+  learnr::tutorial:
+    progressive: true
+    allow_skip: true
+runtime: shiny_prerendered
+description: "Reading and Additional Introduction to the R Environment"
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+library(tutorial.helpers)
+options(repos = c(CRAN = "https://cran.rstudio.com"))
+
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(out.width = '90%')
+options(tutorial.exercise.timelimit = 60, 
+        tutorial.storage = "local") 
+```
+
+## Introduction
+
+This tutorial serves as the first Exercise for our class. The exercise is meant to follow along with the reading excerpt of Chapter 1: Getting Started with Data in R from *Statistical Inference via Data Science* by Ismay, Kim, and Valdivia. The reading will be posted to our TCU Online course page. As you read the chapter, there will be exercises in this document to accompany the reading. Please download your work at the end and submit as a document upload on the course website. 
+
+## Exercises 
+
+We have already completed the download and setup for `R` and `RStudio`, so you can skip through section 1.1.2.
+
+### Concept Check 1
+
+We have already touched on a few of the concepts and terms introduced in section 1.2.1, but others are new. In the textbox below, define in your own words the concept of *conditionals*. Namely: 
+
+- how do we test for equality in `R`? 
+- what is meant by a Boolean (or "Boolean algebra")?
+- what are logical operators and how are they used?
+
+```{r reading-terms-1}
+question_text(NULL,
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 5)
+```
+
+### Concept Check 2
+
+What are the differences between errors, warnings, and messages?
+
+```{r reading-terms-2}
+question_text(NULL,
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 5)
+```
+
+### Package Install, revisited
+
+While we have learned about `R` packages already, section 1.3.1 is a useful refresher, and also introduces an easier installation procedure available in RStudio.
+
+**Note**: if you do not have the "Packages" tab in the "Files" pane as described, try the following: 
+
+1. Go to Tools --> Global Options...
+2. Select the `Packages` tab on the left
+3. Ensure that "Enable packages pane" is checked 
+4. Select `Pane Layout` on the left 
+5. In the bottom right pane, make sure that "Packages" is selected 
+
+### Exercise 4
+
+In your own console/RStudion session, install the `dplyr`, `nycflights23`, and `knitr` packages. Copy/Paste the resulting console output below. 
+
+```{r reading-terms-3}
+question_text(NULL,
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 5)
+```
+
+Now, take the step to load the packages as well. 
+
+```{r load-library, exercise=TRUE}
+library(...)
+library(...)
+library(...)
+```
+
+### Exercise 5
+
+Follow along with the text to examine the `flights` data frame. **Note**: the `View()` function will work in your session of RStudio, but it will *not* work in a code chunk within the tutorial. `kable` also does not work well with the tutorial format. `kable` will be important for future reproducible reports made in Rmarkdown, though. 
+
+Use `glimpse` to examine the `flights` data frame below. 
+
+```{r glimpse-1, exercise=TRUE}
+
+```
+
+Use the special operator `$` to look at the flight `name` variable only.
+
+```{r operator-1, exercise=TRUE}
+
+```
+
+```{r operator-1-hint-1, eval=F}
+[data.frame]$[variable.name]
+```
+
+### Exercise 6
+
+Take a guess at what each of the variables `lat`, `lon`, `alt`, `tz`, `dst`, and `tzone` may describe in these data. 
+
+```{r variable-description-1}
+question_text(NULL,
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 5)
+```
+
+### 
+
+Now, open the help file for the `flights` data frame. 
+
+```{r help1, exercise=TRUE}
+
+```
+
+
+```{r help1-hint-1, eval=F}
+?___
+```
+
+Were your guesses about variable descriptions correct? Revise any variable definitions below. 
+
+```{r variable-description-2}
+question_text(NULL,
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 5)
+```
+
+### Conclusion
+
+Learning `R` programming is almost like learning a foreign language, which is why we are repeating several fundamental concepts in our early readings and exercises. We will dive in with extensive practice over the next few weeks as we learn tools for data visualization, data organization/cleaning/manipulation, and data summarization.
+
+```{r download-answers, child=system.file("child_documents/download_answers.Rmd", package = "tutorial.helpers"),echo=F}
+```
+
