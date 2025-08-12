@@ -216,7 +216,7 @@ Suppose we need to use a new package for our research, such as the `psych` packa
 
 In the RStudio IDE, what is the difference between the syntax editor window and the console window?
 
-```{r knowledgecheck2}
+```{r knowledgecheck2, echo=F}
 question_text(NULL,
 	answer(NULL, correct = TRUE),
 	allow_retry = TRUE,
@@ -229,7 +229,7 @@ question_text(NULL,
 
 What is the purpose/usage of the assignment operator, and what is its symbol?
 
-```{r knowledgecheck3}
+```{r knowledgecheck3, echo=F}
 question_text(NULL,
 	answer(NULL, correct = TRUE),
 	allow_retry = TRUE,
@@ -251,7 +251,7 @@ Below, assign a number to the object `x1` and another number to the object `x2`.
 
 ```{r quiz1, echo=FALSE}
 quiz(caption = "Tutorials and GitHub Packages",
-  question("What function will load a tutorial from an installed package?",
+  question("What function will launch a tutorial from an installed package?",
      answer("library(tutorial_name)", message = "No, the tutorial itself is not a standalone package"),
     answer("tutorials(tutorial_name, package name"),
     
