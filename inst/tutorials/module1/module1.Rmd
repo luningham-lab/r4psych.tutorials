@@ -125,7 +125,7 @@ thirteen <- 13
 
 Now if we call this object in the console or by running code, it will output what is stored in the object - namely, the number 13.
 
-```{r, object2, exercise=T}
+```{r, object2, exercise=T, exercise.setup = "object1"}
 thirteen
 ```
 ###
