@@ -85,15 +85,21 @@ Rstudio includes 4 windows:
     - Environment also includes `Import Dataset` button, a point-and-click convenience function for reading in data
 - **utility** pane, which can show plots, tables, help windows, and file paths
 
-###
+### Objects
 
 When performing data analysis in `R`, we often need to create longer series of codes with multiple types of functions and multiple things (e.g., variables) that we perform those functions on. Thankfully, `R` is an object-oriented coding language, meaning we can create placeholders called **"objects"** that store data, functions, or even the result of functions. 
+
+###
 
 To create an object, we use the *assignment* operator, `<-`. The assignments have the form of 
 
 ```{r, eval=F}
 object <- value
 ```
+
+We often read the assignment operator as "gets", as in, "the `object` **gets** this `value`.
+
+###
 
 Here is an example. In the code chunk below, type `8 + 5` and run code. This is equivalent to running this math once in the `R` console. 
 
@@ -105,6 +111,8 @@ Here is an example. In the code chunk below, type `8 + 5` and run code. This is 
 ```{r math1-hint-1, eval=F}
 8 + 5
 ```
+
+
 ###
 
 The result of the function (the `+` is a math function) is printed in the console; however, if we wanted to do the calculation a second time, we'd have to re-type `8 + 5`. Instead, we can assign the number 13 to an object:
@@ -114,7 +122,6 @@ thirteen <- 13
 ```
 
 (be sure to hit "Run Code")
-###
 
 Now if we call this object in the console or by running code, it will output what is stored in the object - namely, the number 13.
 
@@ -123,11 +130,11 @@ thirteen
 ```
 ###
 
-We can also assign the result of a function to an object. 
+We can also assign the result of a function, such as `8 + 5`, to an object. 
 
 
 ```{r math2, exercise=TRUE}
-thirteen <- 8 + 5
+thirteen <- ...
 thirteen
 ```
 
@@ -141,7 +148,7 @@ thirteen <- "8 + 5"
 thirteen
 ```
 
-We will cover variable types and some of these coding quirks extensively throughout the semester. 
+Our reading assignment this week discusses other types of data in `R`. We will cover variable types and some of these coding quirks extensively throughout the semester. 
 
 ## Accessing Tutorials
 
@@ -166,22 +173,103 @@ To launch a tutorial on your own computer (laptop or lab PC), we will use a func
 learnr::run_tutorial("rstudio", package = "tutorial.helpers")
 ```
 
-The `rstudio` tutorial above is the next module that you will go through. After `learnr` and `tutorial.helpers` are installed, you can run that line above to launch the tutorial in an RStudio/web browser window. 
-Each time a tutorial is assigned, I will provide the one-liner code needed to open it. 
+As an aside, this specific syntax above with the double colon `::` is a special use where we call a function from a specific package without loading the entirety of the package into the active library. In other words, `learnr` is installed, but you do not have to run `library(learnr)` to access the `run_tutorial()` function when it is written this way. 
 
 ###
 
-To access tutorials for additional content or assignments in our course, you will need to download my package from GitHub. The package is called `r4psych.tutorials`. Always install the latest version before launching a new tutorial or assignment module. To install, run: 
+The `rstudio` tutorial above is the next module that you will go through. After `learnr` and `tutorial.helpers` are installed, you can run that line above to launch the tutorial in an RStudio/web browser window. 
+Each time a tutorial is assigned, I will provide the one-liner code needed to open it. 
+
+### `r4psych.tutorials`
+
+I have also created a custom package containing tutorials, exercises, and homework assignments for this class. To access tutorials for additional content or assignments in our course, you will need to download my package from GitHub. The package is called `r4psych.tutorials`. Always install the latest version before launching a new tutorial or assignment module. To install, run: 
 
 ```{r, eval=F}
 remotes::install_github("luningham-lab/r4psych.tutorials")
 ```
+
+To walk through this: 
+- `remotes` is an additional package that can access content from the Web. 
+- `install_github` is a function that will install `R` packages that are uploaded to the website GitHub and not necessarily available on the Comprehensive `R` Archive Network (CRAN). Packages can be updated and distributed much quicker through GitHub than CRAN. 
+- `luningham-lab` is my GitHub account, and this directs the `install` function to the correct user's library to find the package.
+
+### 
+
+This package is a living and breathing entity, so it will be important that you re-install it with the above code frequently.
 
 Now you can load tutorials from this package (again, code will be provided):
 
 ```{r, eval=F}
 learnr::run_tutorial("module1", package = "r4psych.tutorials")
 ```
+
+## Knowledge Check 
+
+Suppose we need to use a new package for our research, such as the `psych` package. In the code chunk below, write both lines of code needed to install the package and then load it into the active library. 
+
+```{r knowledgecheck1, exercise=TRUE}
+
+
+```
+
+### Question 2
+
+In the RStudio IDE, what is the difference between the syntax editor window and the console window?
+
+```{r knowledgecheck2}
+question_text(NULL,
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 5)
+```
+
+### Question 3
+
+What is the purpose/usage of the assignment operator, and what is its symbol?
+
+```{r knowledgecheck3}
+question_text(NULL,
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 5)
+```
+
+### Question 4
+
+Below, assign a number to the object `x1` and another number to the object `x2`. Then, assign their sum to the object `y`. Examine `y` (run it on its own line) to make sure everything executed as expected.  
+
+```{r knowledgecheck4, exercise=TRUE}
+
+
+```
+
+### Question 5
+
+```{r quiz1, echo=FALSE}
+quiz(caption = "Tutorials and GitHub Packages",
+  question("What function will load a tutorial from an installed package?",
+     answer("library(tutorial_name)", message = "No, the tutorial itself is not a standalone package"),
+    answer("tutorials(tutorial_name, package name"),
+    
+    answer("learnr::run.Tutorials(\"tutorial_name\", package=\"package\" ", message="not quite - R is very particular about exact symbols and letter case."),
+    answer("learnr::run_tutorial(\"tutorial_name\", package=\"package\" ", correct=T),
+    allow_retry = TRUE
+  ),
+  question("How can we install/update the class package from GitHub?",
+answer("library(r4psych.tutorials)", message = "This will load the previously downloaded version, but it won't install or update the cotents of the package."),
+    answer("GitHub::install.packages(\"r4psch.tutorials\")"),
+    answer("remotes::install.packages(\"r4psch.tutorials\")", message="not quite - install.packages is from base R, not from the remotes package, and we need to tell R the specific user's library to find the package."),
+    answer("remotes::install_github(\"luningham-lab/r4psych.tutorials\")", correct=T),
+    allow_retry = TRUE
+  )
+)
+```
+
+
 
 ```{r download-answers, child=system.file("child_documents/download_answers.Rmd", package = "tutorial.helpers"),echo=F}
 ```
