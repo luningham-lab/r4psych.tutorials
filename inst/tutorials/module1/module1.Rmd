@@ -15,6 +15,18 @@ description: "Basic Introduction to `R` Environment and Tutorial Access"
 library(learnr)
 library(tutorial.helpers)
 options(repos = c(CRAN = "https://cran.rstudio.com"))
+if (!requireNamespace("gradethis", quietly = TRUE)) {
+  learnr::tutorial_warning(
+    "This tutorial uses the **gradethis** package to provide feedback.  
+    It looks like you don’t have gradethis installed yet.  
+    Please run this in your console:
+    
+    remotes::install_github('rstudio-education/gradethis')"
+  )
+} else {
+  library(gradethis)
+  gradethis::gradethis_setup()  # optional: standardizes grading defaults
+}
 ```
 
 ```{r info-section, child=system.file("child_documents/info_section.Rmd", package = "tutorial.helpers"),echo=F}
@@ -253,10 +265,10 @@ Below, assign a number to the object `x1` and another number to the object `x2`.
 quiz(caption = "Tutorials and GitHub Packages",
   question("What function will launch a tutorial from an installed package?",
      answer("library(tutorial_name)", message = "No, the tutorial itself is not a standalone package"),
-    answer("tutorials(tutorial_name, package name"),
+    answer("tutorials(tutorial_name, package name)"),
     
-    answer("learnr::run.Tutorials(\"tutorial_name\", package=\"package\" ", message="not quite - R is very particular about exact symbols and letter case."),
-    answer("learnr::run_tutorial(\"tutorial_name\", package=\"package\" ", correct=T),
+    answer("learnr::run.Tutorials(\"tutorial_name\", package=\"package\") ", message="not quite - R is very particular about exact symbols and letter case."),
+    answer("learnr::run_tutorial(\"tutorial_name\", package=\"package\") ", correct=T),
     allow_retry = TRUE
   ),
   question("How can we install/update the class package from GitHub?",
