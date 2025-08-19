@@ -16,7 +16,19 @@ description: "Reading and Additional Introduction to the R Environment"
 library(learnr)
 library(tutorial.helpers)
 options(repos = c(CRAN = "https://cran.rstudio.com"))
-
+options(repos = c(CRAN = "https://cran.rstudio.com"))
+if (!requireNamespace("gradethis", quietly = TRUE)) {
+  learnr::tutorial_warning(
+    "This tutorial uses the **gradethis** package to provide feedback.  
+    It looks like you don’t have gradethis installed yet.  
+    Please run this in your console:
+    
+    remotes::install_github('rstudio-education/gradethis')"
+  )
+} else {
+  library(gradethis)
+  gradethis::gradethis_setup()  # optional: standardizes grading defaults
+}
 knitr::opts_chunk$set(echo = FALSE)
 knitr::opts_chunk$set(out.width = '90%')
 options(tutorial.exercise.timelimit = 60, 
@@ -33,19 +45,29 @@ We have already completed the download and setup for `R` and `RStudio`, so you c
 
 ### Concept Check 1
 
-We have already touched on a few of the concepts and terms introduced in section 1.2.1, but others are new. In the textbox below, define in your own words the concept of *conditionals*. Namely: 
-
-- how do we test for equality in `R`? 
-- what is meant by a Boolean (or "Boolean algebra")?
-- what are logical operators and how are they used?
+We have already touched on a few of the concepts and terms introduced in section 1.2.1, but others are new. In the questions below, define in your own words the concept of *conditionals*. 
 
 ```{r reading-terms-1}
-question_text(NULL,
+quiz(
+  question_text("How do we test for equality in `R`?",
+	answer("", correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 3),
+  question_text("What is meant by a Boolean (or \"Boolean algebra\")?",
+	answer(NULL,correct=T),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 3),
+  question_text("what are logical operators and how are they used?",
 	answer(NULL, correct = TRUE),
 	allow_retry = TRUE,
 	try_again_button = "Edit Answer",
 	incorrect = NULL,
-	rows = 5)
+	rows = 3)
+)
 ```
 
 ### Concept Check 2
