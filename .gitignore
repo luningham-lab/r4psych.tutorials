@@ -1,2 +1,14 @@
-.Rproj.user
 .Rhistory
+.RData
+.Ruserdata
+
+# RStudio project files
+.Rproj.user/
+
+# macOS system files
+.DS_Store
+
+# Temporary files
+*.swp
+*.bak
+*.tmp
