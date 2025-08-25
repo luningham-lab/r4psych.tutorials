@@ -138,7 +138,7 @@ Now examine the `airlines` data frame. Use the special operator `$` to look at t
 
 ### Exercise 6
 
-Inspect the `airports` data frame. Take a guess at what each of the variables `lat`, `lon`, `alt`, `tz`, `dst`, and `tzone` may describe in these data. 
+Inspect the `airports` data frame. Take a guess at what each of the variables `lat`, `lon`, `alt`, `tz`, `dst`, and `tzone` may describe in these data.
 
 ```{r variable-description-1}
 question_text(NULL,
