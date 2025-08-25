@@ -16,6 +16,9 @@ description: "Introduction to and Practice with ggplot2"
 library(learnr)
 library(tutorial.helpers)
 library(tidyverse)
+library(knitr)
+library(palmerpenguins)
+library(ggthemes) 
 options(repos = c(CRAN = "https://cran.rstudio.com"))
 if (!requireNamespace("gradethis", quietly = TRUE)) {
   learnr::tutorial_warning(
