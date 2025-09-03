@@ -475,10 +475,17 @@ flights <- ... |>
 flights <- flights |>
   mutate(gain = [dep - arr])
 ```
-  
+
+```{r, mutate2b, include=FALSE}
+flights <- flights |>
+  mutate(gain = dep_delay - arr_delay)
+```
+
+
+
 Now `select` and view the columns `dep_delay`, `arr_delay`, and `gain` to double-check our work. 
 
-```{r, mutate3, exercise=TRUE, exercise.setup = "mutate2"}
+```{r, mutate3, exercise=TRUE, exercise.setup = "mutate2b"}
 
 
 ```
@@ -487,7 +494,7 @@ Now `select` and view the columns `dep_delay`, `arr_delay`, and `gain` to double
 
 Our created variable is now accessible just like any other variable in the dataset. Let's obtain some summary statistics of our new `gain` variable, including `mean`, `median`, `sd`, `min`, and `max`. A very helpful summary is also the number of missing observations. This can be calculated with `sum(is.na(gain))`. Here, `is.na` returns a `TRUE` or `FALSE` for every observation if it's missing. Summing up these booleans gives a 1 for every `TRUE` and a 0 for every `FALSE`. 
 
-```{r, mutate4, exercise=TRUE, exercise.setup = "mutate2"}
+```{r, mutate4, exercise=TRUE, exercise.setup = "mutate2b"}
 
 
 ```
