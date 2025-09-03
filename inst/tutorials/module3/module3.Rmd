@@ -314,6 +314,7 @@ glimpse(...)
 
 ## `select()`
 ###
+
 For special operations or summaries, we may want to retain a subset of all the variables (columns) in a dataset. `select()` will do this for us easily: 
 
 ![](./images/select_image.png)
@@ -373,7 +374,9 @@ flights |>
   glimpse()
 ```
 
+
 ## `summarize()`
+
 ###
 A critical step for understanding our data is to calculate summary statistics of important variables. `summarize()` is a convenient way to obtain summaries of our data. 
 
@@ -435,6 +438,7 @@ weather |>
 
 ## Mutate 
 ###
+
 
 `mutate()` is function that uses existing variable to create a new variable. This can involve converting units, recoding categories, or discretizing a continuous variable into a categorical one.
 
@@ -516,6 +520,7 @@ flights |>
 ```
 
 ## `group_by()`
+
 ###
 
 `group_by()` is a function that will assign specific groupings to rows before performing other functions. For example, recall our previous summary of the mean and SD of wind speed:
