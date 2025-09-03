@@ -548,6 +548,21 @@ weather |>
 
 Note that `group_by()` doesn't actually change the dataframe on its own. Instead, it changes the meta-data of the data frame, so that subsequent functions can recognize a specific grouping structure and act accordingly.
 
+We can see this with the two code chunks below: 
+
+```{r, group6, exercise = TRUE}
+weather |>
+  group_by(month) |> glimpse()
+```
+
+There should be an additional line at the top of the data frame summary stating `Groups: month [12]`, indicating there is a grouping structure called `month` with 12 different levels. We can remove grouping meta-data with `ungroup()`:
+
+```{r, group7, exercise = TRUE}
+weather |>
+  group_by(month) |>
+  ungroup() |> glimpse()
+```
+
 ###
 
 Let's now revisit the `n()` counting function we briefly introduced previously. Recall that the `n()` function counts rows. This is opposed to the `sum()` summary function that returns the sum of a numerical variable. For example, suppose we'd like to count how many flights departed each of the three airports in New York City. 
@@ -576,7 +591,142 @@ We can easily group by more than one variable to create cross tabulations of mul
 
 <button onclick="transfer_code(this)">Copy previous code</button>
 
+## `arrange()`
+###
 
+Suppose we are interested in determining the most frequent destination airports for all domestic flights departing from New York City in 2023. We can use `group_by` and `summarize` to obtain this information: 
+
+```{r, arrange1, exercise = TRUE}
+freq_dest <- flights |>
+  group_by(dest) |>
+  summarize(num_flights = n())
+freq_dest
+```
+
+###
+
+The default is to return the summary table organized by `dest` in alphabetical order. `arrange()` is a quick verb function for sorting rows based on specified variables. 
+
+To sort by total number of flights, pipe the summary table `freq_dest` to `arrange()` and enter `num_flights` as the argument for arrange. 
+
+```{r, arrange2, exercise = TRUE, exercise.setup="arrange1"}
+
+```
+
+```{r, arrange2-hint-1, eval = FALSE}
+freq_dest ...
+  arrange(num_flights)
+```
+
+###
+
+`arrange()` returns values in ascending order by default. To switch to descending order, we use the `desc()` helper function within `arrange`. Replace `arrange(num_flights)` in the prior code chunk with `arrange(desc(num_flights))` below.
+
+```{r, arrange3, exercise = TRUE, exercise.setup="arrange1"}
+
+```
+<button onclick="transfer_code(this)">Copy previous code</button>
+
+## `_join` data frames
+###
+
+In `dplyr`, `join` is the verb for merging two different datasets, matching values with specific rows on a *key* variable. An example of a key variable could be Subject ID. If you had demographic information in one table and survey responses in another table, you could merge these by ID so that each row had the correctly mapped demographic and survey response for each subject. 
+
+Note that there are different "types" of `join`s - the function to merge is not simply `join()`. The primary types are: 
+
+- `left_join(dataset1, dataset2)` will keep all rows from dataset 1 and add the columns from dataset2. If any subject ID is missing in dataset 2, they will still be in the dataset but will have `NA` for variables from the second dataset. 
+- `right_join(dataset1, dataset2)` keeps all values from dataset 2 and matches from dataset 1. 
+- `inner_join(ds1, ds2)` retains only the rows with matches in both datasets. 
+- `full_join(ds1, ds2)` retains all values and all rows, inserting `NA` whenever there are missing matches across datasets. 
+
+###
+
+This seems rather complicated, but here is a quick example. Let's say we have different datasets for different timepoints in a longitudinal study. We had one participant drop out from time 1 to time 2. Run the following chunk to set up the data. 
+
+```{r join1, exercise = TRUE}
+time_1 <- data.frame(subjectID = c(1, 2, 3, 4), Anxiety_Score = c(10,12,14,13))
+time_2 <- data.frame(subjectID = c(1, 2, 4, 5), Anxiety_Score = c(8, 9, 7, 10))
+time_1
+time_2
+```
+
+We have two simple data frames with 4 subjects at time 1 and 4 subjects at time 2. Subject 3 dropped out from time 1 to time 2, and subject 5 joined the study in the second wave. 
+
+###
+
+Let's see the behavior of the different joins: 
+
+```{r, join2, exercise = TRUE, exercise.setup = "join1"}
+left_join(time_1, time_2, by = "subjectID")
+```
+
+This result keeps all subjects from the first dataset (time 1), with `NA` for subject 3 at time 2. Subject 5 is dropped because they do not have a matching value on ID in the left dataset, `time_1`. 
+
+###
+
+```{r, join3, exercise = TRUE, exercise.setup = "join1"}
+right_join(time_1, time_2, by = "subjectID")
+```
+
+This result drops subject 3 because they did not match the second dataset. This result keeps subject 5 from the second dataset but gives them missing data `NA` at time 1. 
+
+###
+
+```{r, join4, exercise = TRUE, exercise.setup = "join1"}
+inner_join(time_1, time_2, by = "subjectID")
+```
+
+This result drops subjects 3 and 5 because the `subjectID` values did not have a match across both datasets. 
+
+###
+
+```{r, join5, exercise = TRUE, exercise.setup = "join1"}
+full_join(time_1, time_2, by = "subjectID")
+```
+
+This result merges all rows and all values, inserting `NA` where needed. 
+
+###
+
+Let's discuss two additional arguments. Note we included `by = "subjectID"`. This indicates the *keying* variable to match rows on across the datasets. The default is to merge by all variables with matching names across the data sets. Since our `Anxiety_Score` variable matches in both datasets, this could causse problems for us: 
+
+```{r, join6, exercise = TRUE, exercise.setup = "join1"}
+full_join(time_1, time_2)
+```
+
+We get the message that it's merging by both variables, so we get unique rows for unique pairs of scores on both ID and Anxiety. This is not what we want! 
+ 
+###
+
+In our previous examples, we matched only by `subjectID`, and the behavior was what we wanted. The variable names for `Anxiety_Score` changed, however, to `Anxiety_Score.x` and `Anxiety_Score.y`. The function will add a `suffix` to matching variable names that aren't used for merging, and we can modify these to be more intuitive. For example:
+
+```{r, join7, exercise = TRUE, exercise.setup = "join1"}
+full_join(time_1, time_2, 
+          by = "subjectID", suffix = c("_t1","_t2"))
+```
+
+I know that my merge will create two new columns, so I have to provide a vector (using `c()`) of exactly two suffixes to use. 
+
+###
+
+We can also use the pipe to combine more than 2 datasets. Be mindful that each join result is passed to the next join, rather than the datasets all getting merged in the same way as the first `join`.  
+
+Below we have data for `time_3`, which sees subject 4 drop out in addition to subject 3.
+
+
+```{r, join8, exercise = TRUE, exercise.setup="join1"}
+time_3 <- data.frame(subjectID = c(1, 2, 5), Anxiety_Score = c(4, 5, 9))
+
+time_1 |>
+  full_join(time_2, by = "subjectID", suffix = c("_t1","_t2"))|>
+  full_join(time_3, by = "subjectID")
+```
+
+###
+
+Notice that subject 3 is retained by the `full_join`, but they have missing values for the columns added from time 2 and time 3. 
+
+Because we already added the suffix merging time 1 and time 2, there is no match for `Anxiety_Score` from the `time_3` data in the second merge. We would need to manually change the name to indicate that this was anxiety from time 3. 
 
 ```{r download-answers, child=system.file("child_documents/download_answers.Rmd", package = "tutorial.helpers"),echo=F}
 ```
