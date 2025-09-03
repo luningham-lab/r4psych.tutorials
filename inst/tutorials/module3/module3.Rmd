@@ -107,7 +107,7 @@ x |>
 
 ###
 
-"Take x, *then* use it as input for the next function `f(), *then* use the output as input for `g()`, *then* use that output as input for `h()`".
+"Take x, *then* use it as input for the next function `f()`, *then* use the output as input for `g()`, *then* use that output as input for `h()`".
 
 As another example, we can use the pipe to "pass" the `penguins` data to a `ggplot`. 
 
