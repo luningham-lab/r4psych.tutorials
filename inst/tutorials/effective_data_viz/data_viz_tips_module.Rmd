@@ -1,0 +1,616 @@
+---
+title: "Tips for Effective Data Visualization"
+tutorial:
+  id: "effective-data-viz"
+  name: "Tips for Effective Data Visualization"
+output: 
+  learnr::tutorial:
+    progressive: true
+    allow_skip: true
+runtime: shiny_prerendered
+author: Justin Luningham
+description: "Accompanying exercise to slides covering tips for effective data visualization."
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(learnr)
+library(knitr)
+library(tutorial.helpers)
+options(repos = c(CRAN = "https://cran.rstudio.com"))
+if (!requireNamespace("scales", quietly = TRUE)) {
+  learnr::tutorial_warning(
+    "This exercise uses the **scales** package.  
+    It looks like you don’t have scales installed yet.  
+    Please run this in your console:
+    
+    install.packages(\"scales\")"
+  )
+} else {
+library(scales) }
+if (!requireNamespace("gradethis", quietly = TRUE)) {
+  learnr::tutorial_warning(
+    "This tutorial uses the **gradethis** package to provide feedback.  
+    It looks like you don’t have gradethis installed yet.  
+    Please run this in your console:
+    
+    remotes::install_github('rstudio-education/gradethis')"
+  )
+} else {
+  library(gradethis)
+  gradethis::gradethis_setup()  # optional: standardizes grading defaults
+}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(out.width = '90%')
+options(tutorial.exercise.timelimit = 60, 
+        tutorial.storage = "local") 
+
+brexit <- tibble(
+  opinion = c(
+    rep("Right", 664), rep("Wrong", 787), rep("Don't know", 188)
+  ),
+  region = c(
+    rep("london", 63), rep("rest_of_south", 241), rep("midlands_wales", 145), rep("north", 176), rep("scot", 39),
+    rep("london", 110), rep("rest_of_south", 257), rep("midlands_wales", 152), rep("north", 176), rep("scot", 92),
+    rep("london", 24), rep("rest_of_south", 49), rep("midlands_wales", 57), rep("north", 48), rep("scot", 10)
+  )
+)
+```
+
+
+```{r info-section, child=system.file("child_documents/info_section.Rmd", package = "tutorial.helpers"),echo=F}
+```
+
+
+```{r copy-code-chunk, child=system.file("child_documents/copy_button.Rmd", package = "tutorial.helpers")}
+```
+
+## Introduction to Data Viz Cleanups
+
+### Keep it simple!
+
+Tell the story in one dimension, rather than three
+
+```{r pie-3d, echo = FALSE, out.width="80%"}
+knitr::include_graphics("images/pie-3d.jpg")
+```
+
+```{r knowledgecheck1, echo=F}
+question_text("What are some issues with the pie chart?",
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 5)
+```
+
+###
+
+It's difficult to distinguish pie chart segment sizes without the numbers overlaid on top.
+
+### Use color selectively 
+
+Consider the two figures below: 
+
+```{r, echo = FALSE}
+d <- tribble(
+  ~category, ~value,
+  "Cutting tools", 0.03,
+  "Buildings and administration", 0.22,
+  "Labor", 0.31,
+  "Machinery", 0.27,
+  "Workplace materials", 0.17
+)
+
+#default colors
+d |>
+  mutate(category = str_replace(category, " ", "\n")) |>
+  ggplot(aes(x = category, y = value, fill = category)) +
+  geom_col() +
+  theme_minimal() +
+  labs(x = "", y = "") +
+  theme(legend.position = "none")
+
+# one red, 4 gray selective coloring 
+# note the scale_fill_manual values requires the same number of colors
+# as there are categories for fill
+ggplot(d, aes(x = fct_reorder(category, value), y = value, fill = category)) +
+  geom_col() +
+  theme_minimal() +
+  coord_flip() +
+  labs(x = "", y = "") +
+  scale_fill_manual(values = c("red", rep("gray", 4))) + 
+  theme(legend.position = "none")
+```
+
+What makes the color change effective here?
+
+```{r knowledgecheck2, echo=F}
+question_text(NULL,
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 5)
+```
+
+### Highlight the story you want to tell
+
+```{r, out.width="95%"}
+knitr::include_graphics("images/time-series-story.png")
+```
+
+Is the goal to tell a story about year-to-year comparisons in hiring, or general trends in hiring? Based on the goal, which image is better?
+
+```{r knowledgecheck3, echo=F}
+question_text(NULL,
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 5)
+```
+
+### Principles	for	effective	visualizations
+
+
+```{r knowledgecheck4, echo=F}
+question_text("List 5 tips for more effective visualizations:",
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 5)
+```
+
+
+## Brexit data 
+###
+
+In hindsight, do you think Britain was right/wrong to vote to leave EU?
+
+- Right to leave  
+- Wrong to leave  
+- Don't know
+
+This code recreates the Brexit survey data: 
+
+
+```{r, brexit, exercise = TRUE}
+brexit <- tibble(
+  opinion = c(
+    rep("Right", 664), rep("Wrong", 787), rep("Don't know", 188)
+  ),
+  region = c(
+    rep("london", 63), rep("rest_of_south", 241), rep("midlands_wales", 145), rep("north", 176), rep("scot", 39),
+    rep("london", 110), rep("rest_of_south", 257), rep("midlands_wales", 152), rep("north", 176), rep("scot", 92),
+    rep("london", 24), rep("rest_of_south", 49), rep("midlands_wales", 57), rep("north", 48), rep("scot", 10)
+  )
+)
+
+brexit
+```
+
+
+
+## Order matters 
+###
+
+Build a simple bar chart depicting the `opinion` responses by completing the code below. Note we created the dataset `brexit` above. 
+
+```{r, plot1, exercise = TRUE, eval = FALSE}
+ggplot(brexit, aes(___ = ___)) +
+  geom____()
+```
+
+
+```{r knowledgecheck5, echo=F}
+question_text("As seen here, ________ order is rarely ideal!",
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 2)
+```
+
+###
+
+We could instead order by descending frequency. We saw a special `tidyverse ` function from the `forcats` package to do this a few weeks ago, `fct_infreq()`. 
+
+```{r, plot2, exercise = TRUE, eval= FALSE}
+ggplot(brexit, aes(___ = fct_infreq(___))) +
+  geom____()
+```
+
+###
+
+Copy and paste the completed code above, but add a layer to include proper labels in our plot. 
+
+```{r, plot3, exercise = TRUE}
+
+```
+
+<button onclick="transfer_code(this)">Copy previous code</button>
+
+###
+
+Let's examine another variable, `region`. Create a simple bar plot depicting the number of respondents to the survey from different regions. 
+
+```{r, plot4, exercise = TRUE, eval= FALSE}
+ggplot(brexit, aes(___ = ___)) +
+  geom____()
+```
+
+### Meaningful factor ordering
+
+These regions have a true geographical meaning, or ordering, inherent to them. Let's use a different `forcats` function called `fct_relevel`. As the name implies, this function changes the levels of a factor. It has three required elements: the data, the variable to relevel, and the new order of levels in a character vector. If we use a pipe, we don't need the `data` argument, and the function works well in a `mutate()` pipeline. 
+
+```{r, relevel, exercise = TRUE}
+brexit <- brexit |>
+  mutate(
+    region = fct_relevel( 
+      region,
+      "london", "rest_of_south", "midlands_wales", "north", "scot"
+    )
+  )
+```
+
+
+```{r, echo = FALSE, warning = F, message = F}
+brexit <- brexit |>
+  mutate(
+    region = fct_relevel( 
+      region,
+      "london", "rest_of_south", "midlands_wales", "north", "scot"
+    )
+  )
+```
+
+###
+
+With the new `region` variable in `brexit`, re-run the same code for the simple bar plot. 
+
+```{r, plot5, exercise = TRUE, eval = FALSE, exercise.setup = "relevel"}
+
+```
+
+###
+
+The labels within the categorical variable itself are not professional or particularly clean. There is a way to change the labels directly in the `ggplot`. We can add a layer called `scale_x_discrete()`, which modifies the scale of a discrete "x" axis variable. Then we provide the argument `(labels = c("new", "labels", "go", "here", "etc"))`. However, this change would not carry over to future plots or use of the particular variable in question. 
+
+###
+
+Another option is to change the labels in the variable itself. Let's learn another helpful `forcats` function called `fct_recode()`. Pipe the data to mutate, then in `fct_relevel`, provide the argments `new_name = "old_name"`. If we use spaces or special characters in the new name, it needs to be wrapped in quotes or back ticks. 
+
+```{r, recode, exercise = TRUE, exercise.setup = "relevel"}
+brexit <- brexit |>
+ mutate(
+   region = fct_recode(
+     region,
+     ___ = "london",
+     `Rest of South` = "rest_of_south",
+     ___ = "midlands_wales",
+     North = ___,
+     Scotland = "scot"
+   )
+ )
+```
+
+```{r, recode2, echo = F, message = F, warning = F}
+brexit <- brexit |>
+  mutate(
+    region = fct_relevel( 
+      region,
+      "london", "rest_of_south", "midlands_wales", "north", "scot"
+    )
+  )
+brexit <- brexit %>%
+  mutate(
+    region = fct_recode( 
+      region,
+      London = "london",
+      `Rest of South` = "rest_of_south",
+      `Midlands / Wales` = "midlands_wales",
+      North = "north",
+      Scotland = "scot"
+    )
+  )
+```
+
+###
+
+Now re-run our simple bar plot by `region` code once again. 
+
+```{r, plot6, exercise = TRUE, eval = FALSE, exercise.setup = "recode2"}
+
+```
+
+## Put long categories on y-axis 
+###
+
+Long axis labels can be hard to read on the x axis. We can change the orientation so they are angled, but in a plot like a bar plot, it is easier to reverse the category labels to the y-axis. 
+
+Create our simple bar pot below with `region` on the **y-axis**. 
+
+```{r, plot7, exercise = TRUE, eval = FALSE, exercise.setup = "recode2"} 
+
+```
+
+###
+
+Hm. We went through all the trouble of re-leveling the regions to go from south to north. But on the `y`-axis, it's not clear if we want the order to go top to bottom or bottom to top. Let's say we wanted to change our order so London is on top, Scotland is on bottom.
+
+###
+
+`forcats` to the rescue again! `fct_rev` will reverse the order of factor levels. 
+
+Copy and paste the simple plot with the labels on y-axis, but add the `fct_rev()` function around `region`. 
+
+```{r, plot8, exercise = TRUE, eval = FALSE, exercise.setup = "recode2"}
+
+```
+
+<button onclick="transfer_code(this)">Copy previous code</button>
+
+###
+
+As before, it's good practice to clean up our labels:
+
+```{r, plot9, exercise = TRUE, eval = FALSE, exercise.setup = "recode2"}
+ggplot(brexit, aes(y = fct_rev(region))) +
+  geom_bar() +
+  labs( 
+    x = ___, 
+    y = ___ 
+  ) 
+```
+
+###
+
+When thinking about including labels, consider the audience, not just your perspective as the plot creator (who is already familiar with the data). That is why we might choose to keep "Region" as the axis label. For those familiar with the UK, these regions are obvious; for other viewers, maybe not so obvious.
+
+## Pick a purpose 
+###
+
+**Our purpose is to answer the question "does opinion about Brexit vary across regions?"**
+
+Below, build a bar plot with `region` on the y-axis but add different colors for `opinion` (using an aesthetic mapping).
+
+```{r, plot10, exercise = TRUE, eval = FALSE, exercise.setup = "recode2"}
+ggplot(brexit, aes(y = region, ___ = opinion)) +
+  geom_bar()
+```
+
+###
+
+The default is a segmented bar plot, but this can be difficult to read and compare. 
+
+Instead, let's break out opinions `faceted` by region. We have definitely seen this before!
+
+```{r, plot11, exercise = TRUE, eval = FALSE, exercise.setup = "recode2"}
+ggplot(brexit, aes(y = opinion, fill = region)) +
+  geom_bar() + ___(~___, nrow = 1)
+```
+
+###
+
+Note there is a new argument in the faceting layer, `nrow = 1`. This keeps all plots in one row and 5 columns for each region. You can remove this argument and Run Code to see the default behavior. 
+
+## Avoid Redundancy 
+###
+
+We have a facet per region and a fill per region. Do we need these colors? 
+
+Copy and paste the code above (adding back `nrow = 1` if needed), but remove `fill = region` in the aesthetic mapping. 
+
+```{r, plot12, exercise = TRUE, eval = FALSE, exercise.setup = "recode2"}
+
+```
+
+<button onclick="transfer_code(this)">Copy previous code</button>
+
+###
+
+Use redundant elements only when they can help tell the story. 
+
+Let's redo the plot and add `fill` back in, but this time do `fill = opinion`. 
+
+```{r, plot13, exercise = TRUE, eval = FALSE, exercise.setup = "recode2"}
+
+```
+
+<button onclick="transfer_code(this)">Copy previous code</button>
+
+###
+
+Opinion is on the `y` aesthetic and the `fill` aesthetic. This helps the reader/viewer to more easily distinguish between the different opinions in each region. This is a case of helpful redundancy. 
+
+However, we can clean up the plot to remove unnecessary elements. `ggplot` has a layer that specifically edits the legend of the plot called `guides()`. If we use a `fill` mapping, then we can change the associated legend with different options in `guides(fill = [options])`. 
+
+###
+
+To remove a legend, we can use `guides(fill = "none")`. Copy and paste our code above, but add this argument as a layer in the plot. 
+
+```{r, plot14, exercise = TRUE, eval = FALSE, exercise.setup = "recode2"}
+
+```
+
+<button onclick="transfer_code(this)">Copy previous code</button>
+
+## Use informative labels 
+###
+
+To really drive the plot home, we can create more informative plot labels. We can leverage the information in the labels to reduce clutter within the plot itself. For example: 
+
+copy and paste the previous code as before, but add a layer for the plot labels. Let's give the plot a `title = "Was Britain right/wrong to vote to leave EU?"`. 
+
+With the title on top of the plot, the y-axis ticks clearly labeled with the opinion responses, and the numbers on x-axis, our axes are probably self-explanatory. We can remove the axis labels altogether with by setting them equal to `NULL`.
+
+###
+
+```{r, plot15, exercise = TRUE, eval = FALSE, exercise.setup = "recode2"}
+ggplot(brexit, aes(y = opinion, fill = opinion)) +
+ geom_bar() +
+ facet_wrap(~region, nrow = 1) +
+ guides(fill = "none") +
+ ___(
+   title = "Was Britain right/wrong to vote to leave EU?",
+   ___ = NULL, ___ = NULL
+ )
+```
+
+###
+
+```{r knowledgecheck6, echo=F}
+question_text("Why use `NULL` instead of an empty label such as `\"\"`?",
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 2)
+```
+
+###
+
+There are other labeling options we haven't seen yet. We can view those with the following example, containing `subtitle` and `caption` for the plot: 
+
+```{r, plot16, exercise = TRUE, eval = FALSE, exercise.setup = "recode2"}
+ggplot(brexit, aes(y = opinion, fill = opinion)) +
+  geom_bar() +
+  facet_wrap(~region, nrow = 1) +
+  guides(fill = "none") +
+  labs(
+    title = "Was Britain right/wrong to vote to leave EU?",
+    subtitle = "YouGov Survey Results, 2-3 September 2019", 
+    caption = "Source: https://d25d2506sfb94s.cloudfront.net/cumulus_uploads/document/x0msmggx08/YouGov%20-%20Brexit%20and%202019%20election.pdf", 
+    x = NULL, y = NULL
+  )
+```
+
+###
+
+Fix this distracting caption with a shortened url: `"Source: bit.ly/2lCJZVg"`: 
+
+```{r, plot17, exercise = TRUE, eval = FALSE, exercise.setup = "recode2"}
+ggplot(brexit, aes(y = opinion, fill = opinion)) +
+  geom_bar() +
+  facet_wrap(~region, nrow = 1) +
+  guides(fill = "none") +
+  labs(
+    title = "Was Britain right/wrong to vote to leave EU?",
+    subtitle = "YouGov Survey Results, 2-3 September 2019",
+    caption = ____, 
+    x = NULL, y = NULL
+  )
+```
+
+###
+
+This is starting to look nice!
+
+### Additional cleaning: adjusting label text
+
+The facet labels are hard to read in the prior plots. `ggplot` contains some helper functions for labels that are usually given within layers using the `labeller` argument. If we have long labels (here, long labels on the facet titles; sometimes, we have long axis labels), we can use a text wrapping function to put the label on multiple lines. 
+
+The function is called `label_wrap_gen()` and the argument is `width = [a number]`, where the number is the number of characters allowed per line. 
+
+###
+
+Here is what that looks like: 
+
+```{r, plot18, exercise = TRUE, eval = FALSE, exercise.setup = "recode2"}
+ggplot(brexit, aes(y = opinion, fill = opinion)) +
+  geom_bar() +
+  facet_wrap(~region,
+    nrow = 1,
+    labeller = label_wrap_gen(width = 12) #new code
+  ) + 
+  guides(fill = "none") +
+  labs(
+    title = "Was Britain right/wrong to vote to leave EU?",
+    subtitle = "YouGov Survey Results, 2-3 September 2019",
+    caption = "Source: bit.ly/2lCJZVg",
+    x = NULL, y = NULL
+  )
+```
+
+###
+
+The number of characters (the "width") for a plot are usually determined through trial and error. 
+
+## Select Meaningful Colors
+###
+
+We used default colors before. Maybe a "meaningful" color map would use red for "wrong" and green for "right". 
+
+We can assign specific colors to fill aesthetics using the `scale_fill_manual()` layer added to the plot. Copy and paste our previous plot, then add a layer of `scale_fill_manual()`. In this function, map the `opinion` values to "red", "green" and "gray". This has to be placed in character vector given to the `values = ` argument.
+
+###
+
+Here's what it looks like: 
+
+```{r, plot19, exercise = TRUE, eval = FALSE, exercise.setup = "recode2"}
+ggplot(brexit, aes(y = opinion, fill = opinion)) +
+  geom_bar() +
+  facet_wrap(~region,
+    nrow = 1,
+    labeller = label_wrap_gen(width = 12) #new code
+  ) + 
+  guides(fill = "none") +
+  labs(
+    title = "Was Britain right/wrong to vote to leave EU?",
+    subtitle = "YouGov Survey Results, 2-3 September 2019",
+    caption = "Source: bit.ly/2lCJZVg",
+    x = NULL, y = NULL
+  ) +
+scale_fill_manual(values = c(
+   "Wrong" = ____,
+   "Right" = "green",
+   "Don't know" = ____
+ ))
+```
+
+(Note: The elements within `c()` don't have to be on different lines, I've just formatted it that way for readability.)
+
+###
+
+This provides meaningful color differences, but the default `red` and `green` are pretty jarring. 
+
+More importantly, these distinctions would not be visible to color blind individuals or those with some sight impairments. There are many ways we can choose better colors. 
+
+One suggestion: [colorbrewer2.org](colorbrewer2.org). It provides suggested color schemes for very disparate images. If provides a Hex code (HTML color code), RBG code (red-blue-green scale), or Cyan, Magenta, Yellow (CMY) and Key (Black) scale (CMYK). `ggplot` works best with Hex codes. 
+
+###
+
+From the code above, replace `"red"` and `"green"` with the Hex codes `"#ef8a62"` and `"#67a9cf"`. 
+
+```{r, plot20, exercise = TRUE, eval = FALSE, exercise.setup = "recode2"}
+
+
+```
+
+<button onclick="transfer_code(this)">Copy previous code</button>
+
+### Theme adjustments 
+
+We saw this last week, but `ggplot` has built in themes that change multiple aspects of the plot appearance (the style of the background, axes, axis ticks, etc.). One such theme is `theme_minimal()`. We can specify these themes by simply adding another layer to the plot. 
+
+```{r, plot21, exercise = TRUE, eval = FALSE, exercise.setup = "recode2"}
+#copy previous code + 
+# add theme layer
+
+```
+
+<button onclick="transfer_code(this)">Copy previous code</button>
+
+###
+
+The following graphic is a helpful reference (we will see this again in other lessons): 
+
+![](visualization-themes.png)
+
+
+```{r download-answers, child=system.file("child_documents/download_answers.Rmd", package = "tutorial.helpers"),echo=F}
+```
+
