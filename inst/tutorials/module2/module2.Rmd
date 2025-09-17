@@ -39,6 +39,8 @@ options(tutorial.exercise.timelimit = 60,
         tutorial.storage = "local") 
 ```
 
+```{r info-section, child=system.file("child_documents/info_section.Rmd", package = "tutorial.helpers"),echo=F}
+```
 
 ```{r copy-code-chunk, child=system.file("child_documents/copy_button.Rmd", package = "tutorial.helpers")}
 ```
@@ -1010,4 +1012,7 @@ Note how the error message explains the problem.
 
 If you get stuck when coding, the first course of action is to try the help page. As we learned last week, you can get help with almost any `R` function by running `?function_name` in the Console, or highlighting the function name and pressing F1 in RStudio. 
 
+
+```{r download-answers, child=system.file("child_documents/download_answers.Rmd", package = "tutorial.helpers"),echo=F}
+```
 
