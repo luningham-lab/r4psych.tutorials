@@ -17,6 +17,8 @@ Imports:
     tidyverse,
     gradethis,
     palmerpenguins,
-    ggthemes
+    ggthemes,
+    ggridges,
+    scales
 Remotes:
     rstudio-education/gradethis
