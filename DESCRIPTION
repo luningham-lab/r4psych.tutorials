@@ -19,6 +19,8 @@ Imports:
     palmerpenguins,
     ggthemes,
     ggridges,
+    patchwork,
+    ggrepel,
     scales
 Remotes:
     rstudio-education/gradethis
