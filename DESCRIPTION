@@ -21,6 +21,8 @@ Imports:
     ggridges,
     patchwork,
     ggrepel,
-    scales
+    scales,
+    infer,
+    moderndive
 Remotes:
     rstudio-education/gradethis
