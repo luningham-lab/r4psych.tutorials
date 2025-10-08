@@ -335,8 +335,59 @@ question_text("What are your impressions of these comparisons? Do you notice dif
 
 Below are my codes and results for the simulation.
 
-```{r sim_solution, message = F, comment = F, warning = F, echo = TRUE, fig.height= 7}
+```{r sim_solution1, exercise = TRUE, fig.height= 7}
+set.seed(2113)
+# Segment 1: sample size = 25 ------------------------------
+# 1.a) Compute sample proportions for 1000 samples, each sample of size 25
+sim_prop_red_25 <- bowl |>
+  rep_slice_sample(n = 25, reps = 1000) |>
+  summarize(prop_red = mean(color == "red"))
 
+# 1.b) Plot a histogram to represent the distribution of the sample proportions
+p1<-ggplot(sim_prop_red_25, aes(x = prop_red)) +
+  geom_histogram(binwidth = 0.04, color = "white") +
+  labs(x = "Proportion of N balls that were red", title = "N = 25")
+
+# Segment 2: sample size = 50 ------------------------------
+# 2.a) Compute sample proportions for 1000 samples, each sample of size 50
+sim_prop_red_50 <- bowl |>
+  rep_slice_sample(n = 50, reps = 1000) |>
+  summarize(prop_red = mean(color == "red"))
+
+# 2.b) Plot a histogram to represent the distribution of the sample proportions
+p2<-ggplot(sim_prop_red_50, aes(x = prop_red)) +
+  geom_histogram(binwidth = 0.04, color = "white") +
+  labs(x = "Proportion of N balls that were red", title = "N = 50")
+
+# Segment 3: sample size = 100 ------------------------------
+# 3.a) Compute sample proportions for 1000 samples, each sample of size 100
+sim_prop_red_100 <- bowl |>
+  rep_slice_sample(n = 100, reps = 1000) |>
+  summarize(prop_red = mean(color == "red"))
+
+# 3.b) Plot a histogram to represent the distribution of the sample proportions
+p3<-ggplot(sim_prop_red_100, aes(x = prop_red)) +
+  geom_histogram(binwidth = 0.03, color = "white") +
+  labs(x = "Proportion of N balls that were red", title = "N = 100")
+
+library(patchwork)
+p1 / p2 / p3 + plot_layout(axis_titles = "collect") + plot_annotation(title = "Combined plots using patchwork") + xlim(.1, .7)
+
+# better option
+
+sim_dat <- bind_rows(sim_prop_red_25, sim_prop_red_50, sim_prop_red_100, .id = "sim")
+
+sim_names<-c(`1` = "N = 25", `2` = "N = 50", `3` = "N = 100")
+
+ggplot(sim_dat, aes(x = prop_red)) +
+  geom_histogram(binwidth = 0.04, color = "white") +
+  facet_wrap(~sim, nrow=3, labeller = as_labeller(sim_names))+
+  labs(x = "Proportion of N balls that were red", title = "Combined plots using facet_wrap()", subtitle = "requires combining sim dat with bind_rows and an ID for each N size") + geom_vline(xintercept = 0.375, color= "red")
+
+```
+
+```{r sim_solution, echo = TRUE, fig.height= 7}
+set.seed(2113)
 # Segment 1: sample size = 25 ------------------------------
 # 1.a) Compute sample proportions for 1000 samples, each sample of size 25
 sim_prop_red_25 <- bowl |>
