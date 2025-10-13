@@ -291,10 +291,58 @@ quiz(question_text("What is the meaning of this final summary proportion, 0.121?
 )
 ```
 
+## Connecting to Theory
+###
+
+What did we demonstrate here? Similar to our previous simulation, we approximated the sampling distribution of a sample mean, the rate (proportion) of complications in liver transplant surgeries. This time, we used the sampling distribution to evaluate a specific claim: that the consultant's rate of complications is meaningfully lower than the general rate of complications. 
+
+The sampling distribution of repeated samples of size 62 showed that we would expect 3 or fewer complications out of 62 patients about 12.1% of the time if the true rate of complication was 10%. Therefore, the consultant's specific set of 62 patients could have 3 instances of complications simply by chance. 
+
 
 ###
 
-In our next module, we will connect this example to theory. 
+
+This probability here, 0.121, is the **p-value** for this hypothesis test. 
+
+**The p-value is the probability of observing data as extreme or more extreme than that observed, given that the null hypothesis is true.** 
+
+
+### 
+
+
+Undoubtedly, you have done some analyses before and obtained p-values without conducting simulation studies. In fact, because of the theoretical properties of sampling distributions, we can calculate p-values from probability distributions directly. 
+
+Consider our example. The instance of a complication is a binomial random variable, and the population rate of complication under the null is 0.10. Our simulation sought to approximate the probability of having three or fewer complications from 62 patients, given that the true rate is 0.10.
+
+###
+
+The binomial distribution has a known formula: 
+
+$$ Prob(\text{x complications out of n}{}) = \binom{n}{x} p^x (1 - p)^{n - x} $$
+Here, $p$ is the probability of complication under the null, $n$ is the total number of patients, $x$ is the number of complications. The stacked number is the binomial coefficient, or the "choose function". 
+
+###
+
+Instead of simulating the data, we can calculate the theoretical probability of data as extreme or more extreme than 3 out of 62 by calculating the probability of 3 complications plus 2 complications plus 1 complication plus 0 complications out of 62 patients. 
+
+`R` has a choose function `choose(n, x)`, and $(1 - p) = 0.90$. Let's see what this would look like: 
+
+```{r binom1, exercise = TRUE}
+choose(62,3)*.9^59*.1^3 + 
+  choose(62,2)*.9^60*.1^2 + 
+  choose(62,1)*.9^61*.1^1 + 
+  choose(62,0)*.9^62*.1^0
+```
+
+How does that result compare to our simulation? 
+
+###
+
+So far we have worked with discrete, binomial outcomes and population proportions. The same theory holds for continuous data and sample means, which are normally distributed. Because the normal distribution is a known distribution, we can calculate *probabilities under the curve* at specific points of the normal curve (ever heard of $Z$ scores?). This follows the exact same principles we've outlined here. 
+
+We won't get into $Z$ scores and $t$ scores in great depth, but we'll review just enough to interpret test results. The key takeaway here from this module is how understanding where the p-value definition comes from: the probability of observing results as or more extreme in a sample if the null hypothesis were true.
+
+Our next module will introduce $t$-tests in `R`. 
 
 
 ```{r download-answers, child = system.file("child_documents/download_answers.Rmd", package = "tutorial.helpers")}
