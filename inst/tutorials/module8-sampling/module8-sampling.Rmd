@@ -335,7 +335,7 @@ question_text("What are your impressions of these comparisons? Do you notice dif
 
 Below are my codes and results for the simulation.
 
-```{r sim_solution1, exercise = TRUE, fig.height= 7}
+```{r sim_solution1, exercise = TRUE, fig.height= 8}
 set.seed(2113)
 # Segment 1: sample size = 25 ------------------------------
 # 1.a) Compute sample proportions for 1000 samples, each sample of size 25
@@ -386,7 +386,7 @@ ggplot(sim_dat, aes(x = prop_red)) +
 
 ```
 
-```{r sim_solution, echo = TRUE, fig.height= 7}
+```{r sim_solution, echo = TRUE, fig.height= 8}
 set.seed(2113)
 # Segment 1: sample size = 25 ------------------------------
 # 1.a) Compute sample proportions for 1000 samples, each sample of size 25
