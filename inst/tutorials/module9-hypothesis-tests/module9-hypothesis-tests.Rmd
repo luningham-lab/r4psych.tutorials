@@ -1,0 +1,301 @@
+---
+title: "Introduction to Statistical Inference using R: Hypothesis Testing"
+tutorial:
+  id: "module9-hypothesis-tests"
+  name: "Hands-on learning about hypothesis testing"
+output: 
+  learnr::tutorial:
+    progressive: true
+    allow_skip: true
+runtime: shiny_prerendered
+author: Justin Luningham
+description: "Hands-on learning about hypothesis testing."
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(infer)
+library(moderndive)
+library(learnr)
+library(tutorial.helpers)
+options(repos = c(CRAN = "https://cran.rstudio.com"))
+if (!requireNamespace("gradethis", quietly = TRUE)) {
+  learnr::tutorial_warning(
+    "This tutorial uses the **gradethis** package to provide feedback.  
+    It looks like you don’t have gradethis installed yet.  
+    Please run this in your console:
+    
+    remotes::install_github('rstudio-education/gradethis')"
+  )
+} else {
+  library(gradethis)
+  gradethis::gradethis_setup()  # optional: standardizes grading defaults
+}
+```
+
+
+```{r info-section, child = system.file("child_documents/info_section.Rmd", package = "tutorial.helpers")}
+```
+
+
+## Key points from last module 
+###
+
+The population is the group of entire members that we want to draw conclusions about. The sample is a subset of the population that we actually observe and use to draw conclusions about the population. 
+
+###
+
+A *sample statistic* is a single value computed using a sample. Also called a point estimate. e.g., mean or proportion. 
+
+The sampling distribution of an estimate is the distribution of the sample statistic computed in all possible samples of the same size from the same population. 
+
+### 
+
+The sampling distribution is normally distributed - symmetrical, bell-shaped, and centered at the population parameter. 
+
+The spread of the distribution is a function of sample size -- as $N$ increases, the spread of the sampling distribution decreases by $1 / \sqrt(N)$ .
+
+### 
+
+We demonstrated these principles through a simple simulation exercise in which we had the entire population in hand and we were able to draw many repeated samples.
+
+We finished by stating that while we don't have a known population in practice, we can use these theoretical principles to draw conclusions about a single sample. 
+
+## Hypothesis testing, applied
+###
+
+We test a specific claim about a population parameter by collecting a random sample and determining if the sample is consistent with the claim. 
+
+### 
+
+"Assuming that the claim is true, how likely is it to observe a sample as extreme or more extreme than the one we have observed?" If the answer is that it would be very unlikely, we have evidence that the claim cannot be true and we would reject it.
+
+### 
+
+The claim in this case is the **null hypothesis**. It is a statement of equality or of the *status quo*. A competing statement called the **alternative hypothesis** makes the opposite statement about the population parameter, but it contains all possible values not included in the null hypothesis. 
+
+### 
+
+The null hypothesis is given "privileged status" in that we assume it is true until we find strong evidence against it. How "strong" is strong enough? Conventional threshold is that it is less than 5% likely to see a sample at least this different from the null distribution if the null were actually true. 
+
+### The jury trial analogy 
+
+**Null hypothesis**: defendant is innocent 
+
+**Alternative hypothesis**: defendant is guilty
+
+**Present evidence**: collect a sample 
+
+**Judge evidence**: "Could this sample plausibly have happened by chance if the null hypothesis were true?" 
+
+- Yes: fail to reject the null 
+- No: reject the null 
+
+### 
+
+"Beyond a reasonable doubt" standard of proof. Our treatment group may have reduced symptoms compared to control, but any two groups of people from the population will have somewhat different levels of symptoms in general. We have to demonstrate that this reduction in symptoms is highly unlikely to have occurred by chance. 
+
+## Example: organ transplant consultant
+###
+
+The conceptual example is inspired by Data Science in a Box content. I have changed the activity to match our prior materials. 
+
+Doctors facilitating organ donation sometimes seek the help of medical consultants who assist the patient in aspects of the surgery and recovery. The goal is to reduce the rate of complications of the procedure. 
+
+One consultant tried to attract patients by advertising that the average complication rate for liver transplants is 10%, but her clients have only had 3 complications in 62 liver donor surgeries that she has worked. She claims this is strong evidence that her work significantly reduces complications. 
+
+###
+
+There are two claims here: 
+
+- **Null Hypothesis**: "there is nothing going on" 
+- **Alternative Hypothesis**: "there is something going on"
+
+
+```{r quiz1, echo = FALSE}
+question_text("In applied terms, what are the null and alternative hypotheses in this example?",
+  answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 3)
+```
+
+###
+
+The general hypothesis testing procedure is to assume that the null hypothesis is true and conduct a test to evaluate how unlikely or extreme the sample data are if the null is actually true. 
+
+Set this up in terms of our example: 
+
+
+```{r quiz4, echo = FALSE}
+quiz(question_text("In the general population, the complication rate is ___?",
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 3),question_text("In the consultant's sample, the complication rate is ___?",
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 3)
+)
+```
+
+### 
+
+The answers give us the assumed population rate $p$ and the sample statistic $\hat{p}$. 
+
+
+###
+
+Last time, we had the population of red and white ball to conduct our simulations from. If we wanted to conduct a simulation here, conceptually brainstorm how we might do that. 
+
+### 
+
+For this case, we need to simulate population data under the null distribution. 
+Any variable that has an outcome of $0 / 1$, true/false, success/failure, etc. is called a binomial random variable. The rate of 1's is the population parameter $p$. 
+
+`R` has many built-in functions for generating random variables from different types of known distributions. For binomial, this function is called `rbinom()` with the following arguments: 
+
+```
+rbinom(n = number of observations,
+size = number of trials (usually just 1),
+prob = probability of "success"
+)
+```
+
+###
+
+For the purposes of our exercise, we could simulate the general population of organ transplant patients under the null hypothesis with a random sample of $1,000,000$ patients. I'm wrapping it in `tibble()` to make sure it's treated like a dataset. 
+
+```{r sim1, exercise = TRUE}
+sim_population <- tibble(complications = rbinom(n = ___, 
+                                                size = 1, 
+                                                prob = ___))
+glimpse(sim_population)
+```
+
+```{r sim1-1, include = FALSE}
+set.seed(2113)
+sim_population <- tibble(complications = rbinom(n = 1000000, 1, 0.10))
+```
+
+###
+
+We want to know if the consultant's complication rate is highly unlikely to come from the general population. e.g., how unlikely is it to see 3 complications out of 62 if the true complication rate is 10%? 
+
+Our consultant has their track record of 62 patients, that can't be changed. But let's simulate the process of the consultant collecting 100 sets of patients. 
+
+###
+
+What function from last time could we use here? 
+
+```{r sim2, exercise = TRUE, exercise.setup = "sim1-1"}
+sim_samples <- sim_population |> 
+  ___(n = ___, reps = 100)
+glimpse(sim_samples)
+```
+
+```{r sim2-2, include=F}
+set.seed(2113)
+sim_population <- tibble(complications = rbinom(n = 1000000, 1, 0.10))
+sim_samples <- sim_population |>
+  rep_slice_sample(n = 62, reps = 100)
+#glimpse(sim_samples)
+```
+
+###
+
+Now we have 100 sets of 62 organ transplant patients. Calculate rates of complication across our repetitions:
+
+```{r sim3, exercise = TRUE, exercise.setup = "sim2-2"}
+sim_samples |> 
+  summarize(complication_rate = ___)
+```
+
+###
+
+How do these simulated complication rates compare to the consultant's claimed complication rate? 
+
+```{r sim4, exercise = TRUE, exercise.setup = "sim2-2"}
+sim_samples |> 
+  summarize(complication_rate = mean(complications)) |> 
+  summarize(mean(complication_rate ___))
+```
+
+###
+
+**How do we interpret this number?**
+
+### 
+
+We can also plot the distribution of complication rates. 
+
+```{r sim5, exercise = TRUE, exercise.setup = "sim2-2", fig.height=5}
+sim_samples |> 
+   summarize(complication_rate = mean(complications)) |> 
+   ggplot(aes(x = complication_rate)) + geom____()
+```
+
+### More reps
+
+Realistically, 100 replicates is not many for a simulation. Redo the simulation with 5000 replications. set the seed with `set.seed(1445)` first.
+
+```{r sim6, exercise = TRUE, exercise.setup = "sim1-1"}
+set.seed(1445)
+sim_samples <- sim_population |>
+  rep_slice_sample(n = 62, reps = 100)
+```
+
+```{r sim6-2, include = FALSE}
+set.seed(2113)
+sim_population <- tibble(complications = rbinom(n = 1000000, 1, 0.10))
+set.seed(1445)
+sim_samples <- sim_population |>
+  rep_slice_sample(n = 62, reps = 5000)
+```
+
+###
+
+Now plot this sampling distribution and calculate how many samples are as extreme or more extreme as our consultant's. 
+
+```{r sim7, exercise = TRUE, exercise.setup = "sim6-2"}
+sim_samples |> 
+   summarize(complication_rate = mean(complications)) |> 
+   ggplot(aes(x = complication_rate)) + geom____() + 
+  geom_vline(xintercept = 3/62)
+
+sim_samples |> 
+   summarize(complication_rate = mean(complications)) |>
+   summarize(___)
+```
+
+###
+
+
+```{r quiz5, echo = FALSE}
+quiz(question_text("What is the meaning of this final summary proportion, 0.121?",
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 3),question_text("What can we say about the consultant's claim?",
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 3)
+)
+```
+
+
+###
+
+In our next module, we will connect this example to theory. 
+
+
+```{r download-answers, child = system.file("child_documents/download_answers.Rmd", package = "tutorial.helpers")}
+```
