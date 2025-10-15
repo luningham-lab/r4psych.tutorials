@@ -338,6 +338,22 @@ How does that result compare to our simulation?
 
 ###
 
+Actually, we have a set of discrete outcomes here. There is an exact outcome of 0 out of 62, 1 out of 62, 2 out of 62, all the way up to 62 out of 62. This is called a *probability mass function*. We could calculate the exact probability of each outcome in the population, as below. 
+
+![](images/binom_prob_mass.png)
+
+### 
+
+For our specific test of interest here, we want to know the probability of 3 *or fewer* successes out of 62: 
+
+![](images/area_under_binom_curve.png)
+
+Summing up those bars is exactly what we calculated before. 
+
+(note that we can count the discrete number of success from 0 to 62, but this is the same as the discrete proportions possible, e.g. 0/62, 1/62, 2/62, ...)
+
+###
+
 So far we have worked with discrete, binomial outcomes and population proportions. The same theory holds for continuous data and sample means, which are normally distributed. Because the normal distribution is a known distribution, we can calculate *probabilities under the curve* at specific points of the normal curve (ever heard of $Z$ scores?). This follows the exact same principles we've outlined here. 
 
 We won't get into $Z$ scores and $t$ scores in great depth, but we'll review just enough to interpret test results. The key takeaway here from this module is how understanding where the p-value definition comes from: the probability of observing results as or more extreme in a sample if the null hypothesis were true.
