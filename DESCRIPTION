@@ -23,6 +23,11 @@ Imports:
     ggrepel,
     scales,
     infer,
-    moderndive
+    moderndive,
+    broom,
+    rempsyc,
+    data.table,
+    flextable,
+    report
 Remotes:
     rstudio-education/gradethis
