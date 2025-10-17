@@ -14,6 +14,7 @@ description: "Performing t-tests in R."
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
+library(MASS)
 library(tidyverse)
 library(infer)
 library(moderndive)
@@ -23,6 +24,8 @@ library(rempsyc)
 library(broom)
 library(data.table)
 library(flextable)
+library(rstatix)
+library(ggpubr)
 library(tutorial.helpers)
 options(repos = c(CRAN = "https://cran.rstudio.com"))
 if (!requireNamespace("gradethis", quietly = TRUE)) {
@@ -41,7 +44,7 @@ if (!requireNamespace("gradethis", quietly = TRUE)) {
 set.seed(144445)
 one_sample <- tibble(first_walk = round(rnorm(50, 12.8, 2.5),1))
 
-library(MASS)
+
 
 raw_pairs<-mvrnorm(25, mu = c(14, 12.8), Sigma = cbind(c(2.5, 1), c(1, 2.5)))
 
@@ -50,6 +53,10 @@ paired_samples <- tibble(sib1 = round(raw_pairs[,1],1), sib2 = round(raw_pairs[,
 paired_long <-paired_samples |> pivot_longer(cols = c(sib1, sib2), values_to = "first_walk", names_to = "sibling")
 
 two_sample<-tibble(control = round(rnorm(50, 14, 2.5),1), intervention = round(rnorm(50, 13, 2.5 ),1))
+
+two_sample_long <- two_sample |> 
+  pivot_longer(cols = c(control, intervention), # or, cols = everything()
+              values_to = "first_walk", names_to = "group")
 ```
 
 
@@ -271,15 +278,22 @@ flextable::save_as_docx(nice_res, path = "one_sample.docx")
 Moving on to researcher 2. They are studying 50 siblings paired within the same family (25 pairs, i.e. 25 families), with one sibling randomly assigned to receive the music therapy. (Ignore the logistical nightmare of actually executing this study prospectively...)
 
 This researcher will used the paired-samples t-test. While we still have 50 observations, the observations are not independent. However, the 25 different *pairs* are independent from each other. 
+###
 
-Let's re-think our null hypothesis for this design. If the null is true, then the average time of first walking should be the same for both siblings, regardless of receiving therapy or not. If the alternative is true, then they are not equal. This could be written as $$H_0: \mu_{sib1} = \mu_{sib2}$$ 
+Let's re-think our null hypothesis ($H_0$) for this design. If the null is true, then the average time of first walking should be the same for both siblings in the pair, regardless of receiving therapy or not. If the alternative is true, then they are not equal.
 
+However, we cannot average the music therapy group and the non-therapy group separately to compare their means because the observations are explicitly paired. They are not independent.
 
 ### 
 
-In the unique case of paired samples, we could also reconfigure the null hypothesis. If there is no effect of therapy, then the average difference between the intervention and control sibs in a pair should be 0. Any difference between them will be due to random factors, and it is random if the treated sibling walks sooner or later than their pair, so the random differences balance out in the long run. In this case, we can calculate a difference score $d$ for each pair, and the null hypothesis is
+In the unique case of paired samples, we need to reconsider the data itself. If there is no effect of therapy, then the mean difference between the intervention and control sibs in a pair should be 0. Any observed difference between them will be due to random factors. Further, it is random if the treated sibling walks sooner or later than their pair, so the random differences balance out in the long run. 
+
+###
+
+In this case, we can calculate a difference score $d$ for each pair, and the null hypothesis is
 
 $$H_0: \mu_d = 0 $$
+
 ###
 
 In other words, for the paired samples t-test, we conduct the test on difference scores. The sampling distribution used for calculating the p-value is the distribution of average difference scores across samples, and the standard error is $SD_{d}/\sqrt{N_{pairs}})$
@@ -296,6 +310,10 @@ glimpse(___)
 
 ###
 
+The two vectors are called `paired_samples$sib1` and `paired_samples$sib2`. It's important to note that in these data, `sib1` is the control sibling and `sib2` is the intervention sibling. Even though the order was randomized within family, the intervention and control observations must be correctly aligned in the data.
+
+###
+
 Before we test, let's conduct some exploratory data analysis. Calculate the mean and SD for each sibling. 
 
 ```{r summ_stat, exercise = TRUE}
@@ -303,8 +321,6 @@ paired_samples |>
   ___
 
 ```
-
-The two vectors are called `paired_samples$sib1` and `paired_samples$sib2`. It's important to note that in these data, `sib1` is the control sibling and `sib2` is the intervention sibling. Even though the order was randomized within family, the intervention and control observations must be correcty aligned in the data.
 
 Add the two vectors for analysis to the `t.test` function with `paired = TRUE`. 
 
@@ -318,18 +334,228 @@ Once again, let's create a `tidy` result and output it with `nice_table`.
 
 ```{r paired3, exercise = TRUE}
 clean_pairs <- tidy(t.test(___))|> 
-  rename(`Sample mean` = estimate, `t-statistic` = statistic, DF = parameter )
+  rename(`Sample mean` = estimate, 
+         `t-statistic` = statistic, 
+         DF = parameter ) |> select(-alternative)
 
-clean_pairs |> nice_table()
+clean_pairs |> nice_table() 
 ```
 
 ### 
 
-How do we interpret the sample mean of 1.85? 
+```{r quiz2, echo = FALSE}
+quiz(question_text("Our siblings all walked around 13-14 months, give or take. Why does the analysis report a sample mean of 1.85?",
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 3),
+	question_text("How do we interpret the p-value and CI results?",
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 3)
+)
+```
 
-### Next time 
+### Independent Samples 
 
-We will analyze the data from Researcher 3's study and examine t-test assumptions through plots. 
+Finally, consider the study conducted by Researcher 3. This researcher randomly assigned 50 children to music therapy and 50 to no music therapy groups. The null hypothesis is that there is no difference in the average walking time across the two groups. 
+
+Under the null hypothesis, both groups are randomly drawn from the same general population, and any differences between the groups are just due to sampling fluctuation and random chance. The alternative hypothesis states that the group means are not equal because the music therapy children come from a different population than the non-therapy children. 
+
+### 
+
+This sounds a lot like the same setup for the sibling pairs, so does the test internally create difference scores between groups and test if the difference scores are equal to zero? 
+
+### 
+
+We cannot create difference scores in this design because the groups are truly independent. There is no logical way to pair up observations from one group with the other group - it would be arbitrary. Instead, we test if the overall difference in means is equal to zero. The null hypothesis is 
+$$ H_0: \mu_1 = \mu_2$$ 
+or equivalently 
+$$ H_0: \mu_1 - \mu_2 = 0$$ 
+
+###
+
+One issue with the independent samples design is that because we have two different samples, there are different ways we can estimate the sample standard deviation: 
+
+1. weighted average of the standard deviations (pooled SD)
+2. estimate standard deviations in each group separately (standard error of the mean difference) 
+
+The shape of the sampling distribution under the null hypothesis changes depending on which approach we use, which reflect **whether or not we assume that the groups have equal variance in the population**. 
+
+###
+
+The default method in `R` does **not** assume equal variances. It uses an approach called Welch's t-test, which adjusts the degrees of freedom through a complex formula that results in non-integer values for the DF. Essentially, as the groups variances become more different, the degrees of freedom get smaller, making the test more conservative (i.e., more extreme sample mean difference needed to reach statistical significance). 
+
+### 
+
+We haven't touched on assumptions much to this point. We will do so for this final example. For the two-sample t-test, we assume that 
+
+1. The observations are truly independent
+2. The data for each group are approximately normally distributed (or, we have large enough samples in each group such that the sampling distribution is normal)
+3. The outcome has equal variance across groups
+
+### 
+
+The first assumption comes down to sampling and study design. The other two are often checked visually. 
+
+Normality can be inspected with distributional plots, such as a histogram. The data are available in the data frame `two_sample`: 
+
+```{r ind1, exercise = TRUE}
+glimpse(two_sample)
+```
+
+### 
+
+The data are in wide format. We can create two different geoms to put them together:
+
+```{r ind2, exercise = TRUE}
+two_sample |> 
+  ggplot(aes(x = control))+
+  geom_histogram(binwidth=.7, fill = "coral", color = "black", alpha = .6) + 
+  geom_histogram(aes(x = intervention), binwidth = .7, 
+                 color = "black", fill = "lightblue", alpha = 0.6)+
+  labs(x = "Walking times", y = NULL)+ 
+  theme_minimal()
+```
+
+### 
+
+Is there another way we could format the data to create this plot?
+
+### 
+
+`ggplot2` has a couple of built-in plots that we have not yet discussed, but they are shortcuts to widely-used plots in mean comparison and regression situations. One is called `ggqqplot()`. 
+
+A Q-Q plot is a way to inspect for normality. It orders the standardized values of the data and compares that to the values of a standardized normal distribution. If the data are normal, they should follow a straight line compared to the theoretical normal. 
+
+###
+
+First, we need to create a long format dataset. Then we use `ggqqplot`. It requires a dataset and variable names of the data, rather than explicitly mapping aesthetics as we usually do with `ggplot`. 
+
+Here is how to use it: 
+
+```{r ind3, exercise = TRUE}
+two_sample_long <- two_sample |> 
+  pivot____(cols = c(control, intervention), # or, cols = everything()
+              values_to = "first_walk", names_to = "group")
+
+ggqqplot(two_sample_long, x = "first_walk", facet.by = "group")
+```
+
+### 
+
+The control group is approximately normal except for the highest and lowest points. I wouldn't say these qualify as outliers - they are just somewhat unexpected due to chance. 
+
+Another built-in ggplot is a multi-group boxplot. This is accessed by `ggboxplot()`. 
+
+```{r ind4, exercise = TRUE}
+# minimal required arguments
+ggboxplot(two_sample_long, x = "group", y = "first_walk") 
+
+#making it slightly nicer
+ggboxplot(two_sample_long, x = "group", y = "first_walk",
+          ylab = "Age at first walking", add = "jitter",
+          color = "group")
+```
+
+###
+
+Finally, we can explicitly test the equality of variances with a Levene's test. The test is available from the `rstatix` package. Note that the null hypothesis here is that variances are equal; a significant p-value indicates a difference between groups. 
+
+```{r ind5, exercise = TRUE}
+library(rstatix)
+two_sample_long |> levene_test(first_walk ~ group)
+```
+
+In practice, this test by itself is not always reliable. It can be too sensitive with really large sample sizes. 
+
+###
+
+According to the test, we could assume equal variances.
+
+Finally, we will conduct the independent samples t-test. This can actually be carried out in either wide or long format. 
+
+```{r ind6, exercise = TRUE}
+#wide form: provide two vectors
+t.test(two_sample$control, two_sample$intervention)
+
+#long form: provide a formula & data
+t.test(first_walk ~ group, two_sample_long)
+```
+
+### 
+
+The default assumes unequal variances.
+
+To change that, we need `var.equal = TRUE` argument. 
+
+```{r ind7, exercise = TRUE}
+t.test(first_walk ~ group, two_sample_long,
+       var.equal = TRUE)
+```
+
+
+```{r quiz3, echo = FALSE}
+quiz(question_text("How can we know from the output if equal variances were assumed or not?",
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 3),
+  question_text("What is the probability of observing a sample mean difference this large if there is actually no mean difference in the population?",
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 3),
+	question_text("How do we interpret the p-value, sample mean difference, and CI of this result? Is the result statistically significant?",
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 3)
+)
+```
+
+### 
+
+Let's make the output nice, one last time. 
+
+```{r ind8, exercise = TRUE}
+clean_2sample <- tidy(t.test(
+  first_walk ~ group, two_sample_long,
+       var.equal = TRUE)) |> 
+  rename(`Mean difference` = estimate, 
+         `t-statistic` = statistic,
+         `Control mean` = estimate1, `Therapy Mean` = estimate2,
+         DF = parameter ) |> select(-alternative)
+
+nice_res<-clean_2sample|> nice_table() 
+nice_res
+#export to word
+flextable::save_as_docx(nice_res, path = "two_sample.docx")
+```
+
+### APA style write-up
+
+We conducted an independent samples t-test to examine mean differences between the intervention and control groups. Levene's test was not significant ($\chi^2(1, 98) = 1.44, p = 0.233$), suggesting equal variances can be assumed across groups. The t-test indicated significant mean differences between the groups ($t(98) = 1.99, p = 0.049)$, with an estimated mean difference of 1.11 months (95% CI: 0.00, 2.22). Figure 1 presents the distribution of walking time in months between the groups, illustrating the small difference between the two. 
+
+```{r ind9, exercise = TRUE, fig.height=5.5}
+library(ggpubr)
+ggboxplot(two_sample_long, x = "group", y = "first_walk",
+          ylab = "Age at first walking", add = "jitter",
+          title = "Figure 1. Time to first walking by treatment group.", 
+          subtitle = "The treatment group walks sooner, but the difference is small.",
+          color = "group") + #bonus! from ggpubr:
+  stat_compare_means(method = "t.test", 
+                     label="p.signif", #"p.format" will use number
+                     comparisons = list(c("control", "intervention")))
+```
+
+see documentation on `ggpubr`:[https://rpkgs.datanovia.com/ggpubr/]( https://rpkgs.datanovia.com/ggpubr/)
 
 ```{r download-answers, child = system.file("child_documents/download_answers.Rmd", package = "tutorial.helpers")}
 ```
