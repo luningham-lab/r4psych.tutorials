@@ -28,6 +28,9 @@ Imports:
     rempsyc,
     data.table,
     flextable,
-    report
+    report,
+    MASS,
+    ggpubr,
+    rstatix
 Remotes:
     rstudio-education/gradethis
