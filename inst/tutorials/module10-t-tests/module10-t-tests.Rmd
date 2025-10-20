@@ -541,7 +541,7 @@ flextable::save_as_docx(nice_res, path = "two_sample.docx")
 
 ### APA style write-up
 
-We conducted an independent samples t-test to examine mean differences between the intervention and control groups. Levene's test was not significant ($\chi^2(1, 98) = 1.44, p = 0.233$), suggesting equal variances can be assumed across groups. The t-test indicated significant mean differences between the groups ($t(98) = 1.99, p = 0.049)$, with an estimated mean difference of 1.11 months (95% CI: 0.00, 2.22). Figure 1 presents the distribution of walking time in months between the groups, illustrating the small difference between the two. 
+We conducted an independent samples t-test to examine mean differences between the intervention and control groups. Levene's test was not significant ($F(1, 98) = 1.44, p = 0.233$), suggesting equal variances can be assumed across groups. The t-test indicated significant mean differences between the groups ($t(98) = 1.99, p = 0.049)$, with an estimated mean difference of 1.11 months (95% CI: 0.00, 2.22). Figure 1 presents the distribution of walking time in months between the groups, illustrating the small difference between the two. 
 
 ```{r ind9, exercise = TRUE, fig.height=5.5}
 library(ggpubr)
