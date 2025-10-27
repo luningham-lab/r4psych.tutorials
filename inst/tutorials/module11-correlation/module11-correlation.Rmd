@@ -1,0 +1,269 @@
+---
+title: "Crash course on correlation in R"
+tutorial:
+  id: "module10-t-tests"
+  name: "Correlation in R"
+output: 
+  learnr::tutorial:
+    progressive: true
+    allow_skip: true
+runtime: shiny_prerendered
+author: Justin Luningham
+description: "Correlation in R."
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(MASS)
+library(infer)
+library(moderndive)
+library(learnr)
+library(report)
+library(rempsyc)
+library(broom)
+library(data.table)
+library(flextable)
+library(rstatix)
+library(ggpubr)
+library(tidyverse)
+library(tutorial.helpers)
+options(repos = c(CRAN = "https://cran.rstudio.com"))
+if (!requireNamespace("gradethis", quietly = TRUE)) {
+  learnr::tutorial_warning(
+    "This tutorial uses the **gradethis** package to provide feedback.  
+    It looks like you don’t have gradethis installed yet.  
+    Please run this in your console:
+    
+    remotes::install_github('rstudio-education/gradethis')"
+  )
+} else {
+  library(gradethis)
+  gradethis::gradethis_setup()  # optional: standardizes grading defaults
+}
+
+set.seed(144445)
+one_sample <- tibble(first_walk = round(rnorm(50, 12.8, 2.5),1))
+raw_pairs<-mvrnorm(25, mu = c(14, 12.8), Sigma = cbind(c(2.5, 1), c(1, 2.5)))
+
+paired_samples <- tibble(sib1 = round(raw_pairs[,1],1), sib2 = round(raw_pairs[,2],1), famID=1:25)
+
+paired_long <-paired_samples |> pivot_longer(cols = c(sib1, sib2), values_to = "first_walk", names_to = "sibling")
+
+two_sample<-tibble(control = round(rnorm(50, 14, 2.5),1), intervention = round(rnorm(50, 13, 2.5 ),1))
+
+two_sample_long <- two_sample |> 
+  pivot_longer(cols = c(control, intervention), # or, cols = everything()
+              values_to = "first_walk", names_to = "group")
+
+dat <- read_delim("data/Tab10-2.txt", 
+    delim = "\t", escape_double = FALSE, 
+    trim_ws = TRUE)
+```
+
+
+```{r info-section, child = system.file("child_documents/info_section.Rmd", package = "tutorial.helpers")}
+```
+
+
+## A first run of correlation in R
+###
+
+Correlation is one of the most common exploratory and inferential methods used in all of statistics. Likely, you have worked with correlation before, but let's review some of the most important features and properties of correlation before executing several correlations in `R`. 
+
+Correlation is different from anything we've worked with so far because it is a *bivariate* summary statistic. What does that mean, exactly? 
+
+```{r quiz1, echo = FALSE}
+question_text("A bivariate summary statistic differs from the mean, standard deviation, etc. because...",
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 3)
+```
+
+###
+
+A bivariate summary statistic takes information from two variables and returns one summary number quantifying the relationship between those two variables. 
+
+```{r quiz2, echo = FALSE}
+question_text("In particular, correlation summarizes the strength of the ______________ relationship between two variables.",
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 3)
+```
+
+###
+
+The correlation coefficient in the population is denoted $\rho$, and the estimated correlation or sample statistic is denoted $r$. 
+
+There are actually several different types of correlation coefficients that are used in practice. We will emphasize two in our module today: the Pearson correlation coefficient and the Spearman rank correlation coefficient. 
+
+The Pearson correlation is the most common. It is calculated as the ratio of the covariance of two variables to the product of the standard deviations of the variables: 
+
+$$ r_{XY} = \frac{\text{Cov}(X, Y)}{S_X S_Y} $$
+
+###
+
+The covariance calculates how much change in one variable occurs simultaneously with change in the other variable. Covariance is on the original scale of the variables, so it needs to be standardized by the denominator term. The product of the standard deviations is an indicator of how much variation there is each variable in general. 
+
+```{r quiz3, echo = FALSE}
+question_text("The correlation coefficient is scaled such that its values can only range from ___ to ___.",
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 3)
+```
+
+###
+
+| Value       | Interpretation (using Cohen, 1988 guidelines)        |
+| ------ |---------------| 
+| $1$    | Perfect positive linear association: as one variable **increases**, the other **increases** by the same amount  (in standarized units) | 
+$r = 0.5$ | Strong positive correlation |
+$r = 0.3$ | Medium positive correlation |
+$r = 0.1$ | Weak positive correlation |
+| $0$     | No relationship: the values of each variable change completely independently of the other variable  | 
+$r = -0.1$ | Weak negative correlation |
+$r = -0.3$ | Medium negative correlation |
+$r = -0.5$ | Strong negative correlation |
+| $-1$  | Perfect negative linear association: as one variable **increases**, the other ***decreases*** by the same amount (in standardized units)  |  
+
+###
+
+Correlation is often used in conjunction with exploratory analysis of two quantitative (continuous) variables. 
+
+The dataset `dat` is already loaded in the environment. These data come from a study by Wagner, et al., (1988). This Health Psychology study the subject’s perceived degree of social and environmental stress (`stress`) and a measure of psychological symptoms based on the Hopkins Symptom Checklist (`symptoms`) in the data file. We want to investigate how these variables are associated.
+
+### 
+
+Let's glimpse `dat` below: 
+
+```{r glimpse1, exercise = TRUE}
+glimpse(dat)
+```
+
+
+As a first step, how do we usually visualize the relationship between two quantitative variables? There are two particular `geom`s that are common, and they might be used together. 
+
+###
+
+`tidyverse` has already been loaded. Let's build a plot to examine the data below. 
+
+```{r cor1, exercise = TRUE}
+dat |> 
+  ggplot(aes(x = stress, y = symptoms)) + 
+  geom____() + 
+  geom____(method = "lm") + 
+  theme_minimal()
+```
+
+```{r quiz4, echo = FALSE}
+question_text("Descriptively, based on the figure, how would we describe this relationship?",
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 3)
+```
+
+
+### 
+
+Like other methods, correlation requires a few assumptions. It assumes that 
+
+1. The relationship between $X$ and $Y$ is truly linear 
+2. Each variable is continuous and approximately normally distributed 
+3. The observations are all independent 
+
+Let's quickly check the normality of each variable using the shortcut plot `ggqqplot` that we learned with t-tests. 
+
+```{r cor2, exercise = TRUE}
+ggqqplot(___) # for stress
+ggqqplot(___) # for symptoms
+```
+
+###
+
+These data aren't perfect, they are a little messy at the tail end. But with $N = 107$, the method is pretty reliable and robust given these distributions. 
+
+Base `R` provides two intuitive functions for correlation: `cor()` and `cor.test()`. The first will compute the correlation. 
+
+The required argument for `cor()` is `x`, which can be a vector or a dataset with multiple columns. If we provide one vector, we need to provide a second vector `y` to get the correlation. Below, provide the two vectors from the data like we did for t-tests. 
+
+```{r cor3, exercise = TRUE}
+cor(___, ___)
+```
+
+### 
+
+```{r quiz5, echo = FALSE}
+question_text("How do we interpret this coefficient?",
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 3)
+```
+
+###
+
+The `cor.test` function can accept the same arguments of two vectors. It can also be given the formula specification, but it looks slightly different: the formula is `~ x + y` and `data` arguments. The formula is set up this way to indicate that there is no dependent or independent variable, we simply assess the association between these two variables. 
+
+###
+
+Before we run the test, let's tie this to our brief coverage of null hypothesis significance testing. The null hypothesis for a correlation test is 
+
+$$ H_0: \rho = 0$$ 
+
+the alternative is typically two-sided, i.e. $H_A: \rho \neq 0$. There is a known formula for computing the standard error of the estimate correlation coefficient based on the data and sample size, thus the software can compare the observed estimate to a t distribution, obtain a $t$ test statistic, and calculate a p-value. 
+
+### 
+
+Change `cor` to `cor.test` from our previous syntax. 
+
+```{r cor4, exercise = TRUE}
+cor(dat$stress, dat$symptoms)
+
+#alternative 
+# cor.test(~ symptoms + stress, data=dat)
+```
+
+```{r quiz6, echo = FALSE}
+question_text("What is the probability of observing a correlation of 0.51 if this sample is taken from a population in which the actual correlation is 0?",
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 3)
+```
+
+###
+
+Let's tidy up this example before moving to more issues and extensions of correlation. We can use the `tidy` function from `broom` and the `nice_table()` to make clean, publication-ready tables from our `cor.test` result. 
+
+```{r cor5, exercise = TRUE}
+cor.test(~symptoms + stress, dat) |> 
+  tidy() |> nice_table()
+```
+
+###
+
+As before, we may choose to rename some columns within our pipe between `tidy()` and `nice_table()`, such as changing `parameter` to "DF" and `estimate` to *r*. We can also do this manually after taking the table to Word. 
+
+### 
+
+## Additional Correlation Approaches and Considerations
+###
+
+`cor` and `cor.test` take a couple of additional, optional arguments: 
+
+* `method`: both versions take this argument. The default is `method = "pearson"`. The other options are `"kendall"` or `"spearman`", which are two different non-parametric rank-based correlations. More later. 
+* `use`: 
+
+[in progress] 
+
+```{r download-answers, child = system.file("child_documents/download_answers.Rmd", package = "tutorial.helpers")}
+```
