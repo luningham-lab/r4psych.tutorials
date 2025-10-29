@@ -15,6 +15,7 @@ description: "Correlation in R."
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
 library(MASS)
+library(Hmisc)
 library(infer)
 library(moderndive)
 library(learnr)
@@ -26,6 +27,8 @@ library(flextable)
 library(rstatix)
 library(ggpubr)
 library(tidyverse)
+library(ggcorrplot)
+source("data/correlation_matrix.R")
 library(tutorial.helpers)
 options(repos = c(CRAN = "https://cran.rstudio.com"))
 if (!requireNamespace("gradethis", quietly = TRUE)) {
@@ -58,6 +61,8 @@ two_sample_long <- two_sample |>
 dat <- read_delim("data/Tab10-2.txt", 
     delim = "\t", escape_double = FALSE, 
     trim_ws = TRUE)
+mh <- read_csv("data/MillerHadenData.csv")
+
 ```
 
 
@@ -258,12 +263,273 @@ As before, we may choose to rename some columns within our pipe between `tidy()`
 ## Additional Correlation Approaches and Considerations
 ###
 
-`cor` and `cor.test` take a couple of additional, optional arguments: 
+Previously, we mentioned that the Pearson correlation assumes that the data are approximately normally distributed. We also saw that the `stress` and `symptoms` variables in our data departed from the expected QQ plot on the tail ends, but other was was "ok", so we went forward with the analysis. 
 
-* `method`: both versions take this argument. The default is `method = "pearson"`. The other options are `"kendall"` or `"spearman`", which are two different non-parametric rank-based correlations. More later. 
-* `use`: 
+###
 
-[in progress] 
+We can explicitly test the normality of a variable using the Shaprio-Wilk test, which is available in base `R`. It takes the form of `shapiro.test(dat$vector)`. Below, we test a random sample drawn from a normal distribution and a random sample drawn from the uniform distribution.  
+
+```{r nonparam1, exercise = TRUE}
+shapiro.test(rnorm(100, mean = 5, sd = 3))
+shapiro.test(runif(100, min = 2, max = 4))
+```
+
+###
+
+The null hypothesis of the Shapiro-Wilk test is that the data are normally distributed. A significant p-value indicates the data are not normal, as illustrated in the examples above.
+
+### 
+
+Let's test the `stress` and `symptoms` variables for normality. What do we find?
+
+```{r nonparam2, exercise = TRUE}
+
+
+```
+
+### Non-parametric alternatives
+
+Hm. It seems like these data aren't normal after all. 
+
+There are two widely accepted non-parametric correlation coefficients based on ranked data: Spearman rank order correlation and Kendall's tau ($\tau$). These both summarize the monotonic association between the variables, but they are **non-parametric** because they do not assume that the variables come from any particular type of distribution. 
+
+### 
+
+The Spearman correlation first assigns numeric ranks from 1 to $n$ for each variable, then calculates the correlation using a funky-looking formula proven to work in the 1970's. Kendall's $\tau$ is calculated in a few steps:
+
+1. Rank-order the pairs of $x$ and $y$ values
+2. Compare each pair in the dataset, e.g. $(X_i, Y_i)$ to $(X_j, Y_j)$
+3. The pair is concordant if the ranks are in the same order, e.g. $X_i > X_j$ and $Y_i > Y_j$. If not, the pair is discordant. 
+4. $\tau$ is the number of concordant minus discordant divided by total number of pairs
+
+### 
+
+Spearman is generally more sensitive to smaller discrepancies but cannot handle ties, whereas $\tau$ is considered more robust and can handle ties. 
+
+`cor` and `cor.test` takes an additional argument about the `method`:
+
+* The default is `method = "pearson"`. The other options are `"kendall"` or `"spearman`".
+
+### 
+
+Below, run the correlation test for the Spearman and Kendall methods on `stress` and `symptoms`. 
+
+```{r nonparam3, exercise = TRUE}
+cor.test(dat$stress, dat$symptoms)
+cor.test(dat$stress, dat$symptoms)
+```
+
+### 
+
+These are both significant, but $\tau$ is a bit smaller. It may be more reliable depending on number of ties in the data. 
+
+```{r nonparam4, exercise = TRUE}
+unique(dat$stress)
+```
+
+There are 107 rows, but only 42 unique values of stress, so there could be many ties. 
+
+### Correlation Matrices: Visualization 
+
+In practice, we often have more than just two variables in the analysis that we would correlate with each other. A major part of exploratory data analysis is to examine several pairwise relationships, including calculating many bivariate correlation coefficients. 
+
+Thankfully, there are several useful tools in `R` for visualizing these assocations and testing them. 
+
+We'll  start with a manageable dataset called `mh` for "Miller Haden" data. These come from a study on reading ability, general intelligence, the number of minutes per week spent reading at home, and the number of minutes per week watching TV. First, glimpse the data: 
+
+```{r matrix1, exercise = TRUE}
+glimpse(mh)
+```
+
+### 
+
+A really simple base `R` function for looking at many quantitative variaables is called `pairs()`, which will present pairwise scatterplots of multiple variables. Before we create the pairs, let's remove the `Participant` variable, since it does not have any real quantitative meaning: 
+
+```{r matrix2, exercise = TRUE}
+mh <- mh |> ___
+pairs(mh)
+```
+
+```{r matrix2-2, include = F}
+mh <- mh |> select(-Participant)
+cor_mat <- cor(mh)
+cor_pval <- cor_pmat(mh)
+```
+
+### `ggcorrplot`
+
+Next, load a new library called `ggcorrplot`. This builds on a different package `corrplot`, which helps visualize correlations, but it 1) makes nicer plots, 2) adds options to reorder based on magnitude, 3) adds options to print correlation values on the visual, 4) adds options to display significance levels/p-values. 
+
+We will examine some of these options in the next steps. 
+
+### create a correlation matrix 
+
+First we need to save two objects: a correlation matrix from our data, and a matrix of p-values for the correlation tests.
+
+As mentioned on our previous page, we can calculate a matrix of multiple bivariate correlations by providing a dataset to `cor()`. Assign the result to `cor_mat` below, then print it out. 
+
+```{r matrix3, exercise = TRUE, exercise.setup = "matrix2-2"}
+___ <- ___(mh)
+cor_mat
+```
+
+### 
+
+Next, use a new function from `ggcorrplot` called `cor_pmat()`. This creates a corresponding matrix of p-values from the correlation tests, and it also uses a dataset as its argument. Assign it to `cor_pval`. 
+
+```{r matrix4, exercise = TRUE, exercise.setup = "matrix2-2"}
+cor_pval <- cor_pmat(___)
+cor_pval
+```
+
+### 
+
+To visualize the correlations, we simply provide the correlation matrix `cor_mat` to `ggcorrplot()`. 
+
+```{r matrix5, exercise = TRUE, exercise.setup = "matrix2-2"}
+ggcorrplot(cor_mat)
+```
+
+### 
+
+There are many visual options for tweaking the figures. For example, we can use `method = "circle` argument in `ggcorrplot`: 
+
+```{r matrix6, exercise = TRUE, exercise.setup = "matrix2-2"}
+ggcorrplot(cor_mat)
+```
+
+There is also a gradient of colors based on the strength of the correlation. The default is 1 = `red` and -1 = `blue`, but we can change this. The default color argument is `colors = c("blue", "white", "red")`. If we wanted blue to mean positive and red to mean negative, we can rearrange the order: 
+
+```{r matrix7, exercise = TRUE, exercise.setup = "matrix2-2"}
+ggcorrplot(cor_mat, color = c("darkred", "white", "darkblue"))
+```
+
+(Feel free to play around with the color gradient)
+
+###
+
+We can also make the cells of the matrix more distinguishable with `outline.color`:
+
+```{r matrix8, exercise = TRUE, exercise.setup = "matrix2-2"}
+ggcorrplot(cor_mat, 
+           color = c("darkred", "white", "darkblue"),
+           outline.color="white")
+```
+
+###
+
+A correlation matrix has redundant elements in the lower and upper halves of the matrix. These are referred to as the upper triangle, or "above the diagonal", and the lower triangle "below the diagonal". We can make our presentation a little cleaner by only presenting the upper or lower triangles with the `type` argument. 
+
+```{r matrix9, exercise = TRUE, exercise.setup = "matrix2-2"}
+ggcorrplot(cor_mat, 
+           color = c("darkred", "white", "darkblue"),
+           outline.color="white", 
+           hc.order = TRUE,
+           type = "lower")
+```
+
+Note that this removes the diagonal part altogether. Let's see the upper version: 
+
+```{r matrix10, exercise = TRUE, exercise.setup = "matrix2-2"}
+ggcorrplot(cor_mat, 
+           color = c("darkred", "white", "darkblue"),
+           outline.color="white", 
+           hc.order = TRUE,
+           type = "upper")
+```
+
+### 
+
+To add correlation coefficients directly, we simply add the argument `lab = TRUE`:
+
+```{r matrix11, exercise = TRUE, exercise.setup = "matrix2-2"}
+ggcorrplot(cor_mat, 
+           hc.order = TRUE,
+           type = "lower",
+           ___)
+```
+
+### 
+
+Finally, to add significance/insignificance indicators, we provide our matrix of p-values to the `p.mat` argument. 
+
+```{r matrix12, exercise = TRUE, exercise.setup = "matrix2-2"}
+cor_pval
+ggcorrplot(cor_mat, 
+           hc.order = TRUE,
+           type = "lower",
+           ___ = cor_pval)
+```
+
+X indicates an *insignificant* result. 
+
+###
+
+We can modify the presentation of significant/insignificant results in a few ways. For one, we can actually drop insignificant cells of the matrix altogther with `insig = "blank"`.
+
+```{r matrix13, exercise = TRUE, exercise.setup = "matrix2-2"}
+ggcorrplot(cor_mat, 
+           hc.order = TRUE,
+           type = "lower",
+           p.mat = cor_pval,
+           insig = "blank")
+```
+
+###
+
+There are many default options that can be modified. To see all of the arguments, check out `?ggcorrplot`. As an example, the default insignificant label is the X, but we can change it with `pch = [number]`, where `pch` are the various shapes available in ggplot. The default significance level is 0.05, but we can change this with `sig.level = 0.01`. We can also provide a different theme to change the plot appearance. 
+
+```{r matrix14, exercise = TRUE, exercise.setup = "matrix2-2"}
+ggcorrplot(cor_mat, 
+           hc.order = TRUE,
+           type = "lower",
+           p.mat = cor_pval,
+           sig.level = "0.01",
+           pch = 13, ggtheme = ggpubr::theme_pubr)
+```
+
+### Correlation Matrix Tests with `Hmisc::rcorr`
+
+While we can obtain a separate matrix of p-values, the `cor.test()` function in fact does not let us test multiple things and obtain a `tidy` table. However, several other packages exist to do this, and an easy one is called `Hmisc` with a function `rcorr`. 
+
+`rcorr` takes a matrix of data and returns a correlation matrix and a matrix p-values together. The data.frame must be converted to a matrix for this function, as demonstrated below: 
+
+```{r matrix15, exercise = TRUE, exercise.setup = "matrix2-2"}
+rcorr(as.matrix(mh))
+```
+
+### 
+
+Let's pipe this to `tidy()` and get something nice! 
+
+
+```{r matrix16, exercise = TRUE, exercise.setup = "matrix2-2"}
+rcorr(as.matrix(mh)) |> ___
+```
+
+###
+
+That's not exactly what we're looking for - it just "flattens" the two matrices into a new dataframe. This format can be useful for further summaries and visuals, but usually when we have a large number of variables and correlations to sort through. 
+
+###
+
+I found a custom-built function that creates a publication-ready correlation matrix created by Paul van der Laken on R-bloggers.com. The function is called `correlation_matrix` and it has been included in the course package. We simply provide the dataset to the function, and it will do the rest. 
+
+```{r matrix17, exercise = TRUE,exercise.setup = "matrix2-2"}
+# correlation_matrix() is sourced from correlation_matrix.R script 
+correlation_matrix(mh)
+```
+
+###
+
+This format is a bit clunky within `R` itself, but best of all - it plays well with `nice_table()`!
+
+```{r matrix18, exercise = TRUE,exercise.setup = "matrix2-2"}
+# correlation_matrix() is sourced from correlation_matrix.R script 
+correlation_matrix(mh) |> ___
+```
+
+It could use row names, 
 
 ```{r download-answers, child = system.file("child_documents/download_answers.Rmd", package = "tutorial.helpers")}
 ```
