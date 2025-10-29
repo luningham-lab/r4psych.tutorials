@@ -31,6 +31,8 @@ Imports:
     report,
     MASS,
     ggpubr,
-    rstatix
+    rstatix,
+    Hmisc,
+    ggcorrplot
 Remotes:
     rstudio-education/gradethis
