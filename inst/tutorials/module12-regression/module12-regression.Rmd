@@ -1,0 +1,444 @@
+---
+title: "Crash course on simple regression in R"
+tutorial:
+  id: "module12-regression"
+  name: "Regression in R"
+output: 
+  learnr::tutorial:
+    progressive: true
+    allow_skip: true
+runtime: shiny_prerendered
+author: Justin Luningham
+description: "Regression in R."
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(MASS)
+library(infer)
+library(moderndive)
+library(learnr)
+library(report)
+library(rempsyc)
+library(broom)
+library(data.table)
+library(flextable)
+library(rstatix)
+library(ggpubr)
+library(tidyverse)
+library(tutorial.helpers)
+library(GGally)
+options(repos = c(CRAN = "https://cran.rstudio.com"))
+if (!requireNamespace("gradethis", quietly = TRUE)) {
+  learnr::tutorial_warning(
+    "This tutorial uses the **gradethis** package to provide feedback.  
+    It looks like you don’t have gradethis installed yet.  
+    Please run this in your console:
+    
+    remotes::install_github('rstudio-education/gradethis')"
+  )
+} else {
+  library(gradethis)
+  gradethis::gradethis_setup()  # optional: standardizes grading defaults
+}
+
+set.seed(144445)
+one_sample <- tibble(first_walk = round(rnorm(50, 12.8, 2.5),1))
+raw_pairs<-mvrnorm(25, mu = c(14, 12.8), Sigma = cbind(c(2.5, 1), c(1, 2.5)))
+
+paired_samples <- tibble(sib1 = round(raw_pairs[,1],1), sib2 = round(raw_pairs[,2],1), famID=1:25)
+
+paired_long <-paired_samples |> pivot_longer(cols = c(sib1, sib2), values_to = "first_walk", names_to = "sibling")
+
+two_sample<-tibble(control = round(rnorm(50, 14, 2.5),1), intervention = round(rnorm(50, 13, 2.5 ),1))
+
+two_sample_long <- two_sample |> 
+  pivot_longer(cols = c(control, intervention), # or, cols = everything()
+              values_to = "first_walk", names_to = "group")
+
+dat <- read_delim("~/Downloads/Tab10-2.txt", 
+    delim = "\t", escape_double = FALSE, 
+    trim_ws = TRUE)
+
+
+```
+
+
+```{r info-section, child = system.file("child_documents/info_section.Rmd", package = "tutorial.helpers")}
+```
+
+
+## Regression Overview
+###
+
+Like correlation, regression is perhaps the most commonly used method in modern psychological research, and linear regression (AKA the general linear model) is the foundational building block for most methods you will encounter. 
+
+Regression proposes a statistical model that defines the linear relationship between an outcome variable and one or more explanatory variables. When the regression model is estimated on real data, we usually have one of two purposes in mind:
+
+###
+
+1. For **inference** when we want to *explain* how changes in one or more explanatory variables are associated with changes in the outcome, quantify those changes, and determine which of the explanatory variables actually have a true association with the response. This is our typical use case in psychology.
+
+###
+
+2. For **prediction** when we want to forecast what the value of the outcome will be based on the observed values of the explanatory variables. In this case, we are not concerned about how each of the explanatory variables relate to the response or interact with each other, we simply want to create the most accurate predictions possible.
+
+###
+
+A note on terminology: you may have heard different terms to describe the different elements of a regression model. Many different terms have the same definition and are used interchangeably, with some specific terms more common in certain fields. Some statistical synonyms:
+
+* **outcome**: dependent variable, criterion variable, response
+* **explanatory variable**: independent variable, exposure variable, predictor, regressor
+
+### 
+
+*Linear* regression or the *general linear model* specifically refer to a model for a numeric/quantitative outcome. The distribution of the dependent variable is important in choosing our model. Regressors can be numeric or categorical. 
+
+### The model
+
+The simple regression model has only one regressor, and is written as 
+
+$$Y_i = \beta_0 + \beta_1 X_i + \varepsilon_i$$ 
+
+* $Y_i$ is the outcome for person $i$
+* $\beta_0$ is called the intercept
+* $\beta_1$ is the regression slope for the regressor $X$
+* $X_i$ is the value of $X$ for person $i$
+* $\varepsilon_i$ is the error term for person $i$
+
+### 
+
+Importantly, the errors in the population "balance out" around the regression line - some errors are positive, some are negative, but in the long run, they have a mean of zero. The errors have a constant amount of variability across the entire population. Technically: 
+
+$$\varepsilon_i \sim N(0, \sigma^2)$$
+
+### The estimates
+
+The $\beta$'s and $\sigma^2$ are population parameters. When we "fit" a model to data, we obtain estimates: 
+
+* $\hat{\beta_0}$ or $b_0$
+* $\hat{\beta_1}$ or $b_1$
+* $\hat{\sigma^2}$, "mean squared error"
+
+### Quick `R` example
+
+Purely for illustration, let's use the `mtcars` data to check the relationship between miles per gallon for a vehicle and the vehicle's weight. Like correlation, we can first explore this relationship visually: 
+
+```{r car1, exercise = TRUE}
+ggplot(mtcars, aes(x = wt, y = mpg)) +
+    geom_point(size = 2, alpha = 0.8) +
+  labs(
+        x = "Weight (1000 lbs)",
+        y = "Miles per gallon",
+    ) +
+    theme_minimal(base_size = 12)
+```
+
+### 
+
+The function for regression is called `lm()` for "linear model". It requires two arguments: a `formula` of the form `y ~ x` and `data` for the dataset. Our outcome is `mpg` and our predictor is `wt`. 
+
+```{r car2, exercise = TRUE}
+lm(___,___)
+```
+
+###
+
+This provides estimates to the data for the intercept and slope. The regression line is linear, like correlation, and looks like this:
+
+![](images/regre_plot_1.png){width=95%}
+
+###
+
+```
+Coefficients:
+(Intercept)           wt  
+     37.285       -5.344  
+```
+
+The first value we get is the intercept, interpreted as the expected value (or mean) of $Y$ when $X$ is equal to zero. The intercept is scale-dependent and is not usually of interest by itself. Visually, the intercept is where the regression line hits the y-axis: 
+
+![](images/regre_plot_2.png){width=95%}
+
+###
+
+The slope is often what we want to interpret. The slope is the change in outcome $Y$ per one unit increase in $X$. In this example, the slope is negative, meaning MPG decreases as weight increases: 
+
+![](images/regre_plot_4.png){width=95%}
+
+###
+
+In a regression model, we also obtain a special new estimate, $\hat{y_i}$. This is the predicted score for person $i$ based on the estimates and their score on $x$:
+
+$$ \hat{y_i} = \hat{\beta_0} + \hat{\beta_1} x_i $$ 
+
+Here, and predicted value is denoted in red: 
+
+![](images/regre_plot_5.png){width=95%}
+
+
+### The residual 
+
+A "residual" is the simply the difference between an observed $y$ and a predicted $\hat{y}$. The residuals help us investigate if the model does a good job of explaining the data based on the total errors. 
+
+![](images/regre_plot_7.png){width=95%}
+
+### 
+
+However, the regression line is designed to be the best line that cuts through the "cloud" of data points exactly, meaning that over all data points, the amount of errors "above" and "below" the line balance out. i.e., the residuals of all data points sum to exactly zero! 
+
+Instead, we use the sum of **squared** residuals to quantify the amount of error in the regression. This is often called sum of squared residuals or SSE for sum of squared errors, and is $ \sum_{i = 1}^{n} (y_i - \hat{y}_i)^2$
+
+###
+
+The sum of squared residuals divided by the model degrees of freedom gives the **mean squared error**, which is our best estimate of $\sigma^2$. 
+
+![](images/regre_plot_final.png){width=95%}
+
+### 
+
+```{r, echo = F, warning = F, message = F, comment = "", include = F}
+library(ggplot2)
+library(broom)
+library(dplyr)
+library(ggtext)
+## code to create annotated plot - for reference 
+pm <- function(expr) as.character(as.expression(expr))
+
+# --- Data and model ---
+df  <- mtcars
+fit <- lm(mpg ~ wt, data = df)
+
+# Extract coefficients and variance estimates
+b0 <- unname(coef(fit)[1])                 # intercept
+b1 <- unname(coef(fit)[2])                 # slope
+SSE <- sum(resid(fit)^2)
+n   <- nrow(df)
+dfR <- df.residual(fit)
+sigma2_hat <- SSE / dfR
+sigma_hat  <- sqrt(sigma2_hat)
+
+# Augment data for plotting residuals
+aug <- augment(fit)
+
+# slope triangle interval (+1 in wt)
+x0 <- 3
+x1 <- x0 + 1
+y0 <- b0 + b1 * x0
+y1 <- b0 + b1 * x1
+
+# Choose an example residual 
+i_demo <- df |> filter(mpg == 32.4)
+x_demo <- i_demo$wt
+y_demo <- i_demo$mpg
+yhat_demo <- b0 + b1 * x_demo
+res_demo <- y_demo - yhat_demo
+
+
+p <- ggplot(aug, aes(x = wt, y = mpg)) +
+  geom_point(size = 2, alpha = 0.8) +
+  geom_smooth(method = "lm", se = FALSE, linewidth = 1) +
+  geom_segment(aes(x = wt, xend = wt, y = mpg, yend = .fitted), alpha = 0.5) +
+  geom_hline(yintercept = b0, linetype = "dashed", alpha = 0.6) +
+  geom_vline(xintercept = 0, linetype = "dotted", alpha = 0.6) +
+  geom_point(aes(x = 0, y = b0), color = "firebrick", size = 3) +
+  geom_segment(aes(x = x0, y = y0, xend = x1, yend = y0), linewidth = 0.7) +
+  geom_segment(aes(x = x1, y = y0, xend = x1, yend = y1), linewidth = 0.7) +
+  geom_segment(aes(x = x0, y = y0, xend = x1, yend = y1), linewidth = 1) +
+  annotate("text",
+    x = 0 +.2, y = b0 + 1, hjust = 0, parse = TRUE, size = 4,
+    label = pm(bquote(Intercept: ~ hat(beta)[0] == .(round(b0, 2)) ~
+                      "(mean(Y) when X=0)"))
+  ) +
+  annotate("text",
+    x = x1 - 0.5, y = (y0 + y1)/2+5.4, hjust = 0, vjust = 0.5, parse = TRUE, size = 4,
+    label = pm(bquote(Slope: ~ hat(beta)[1] == .(round(b1, 2)) ~
+                      " per " ~ +1 ~ unit ~ of ~ X))
+  ) +
+  annotate("text",
+    x = (x0 + x1)/2, y = y0 +1.1, vjust = 1, parse = TRUE, size = 3.8,
+    label = pm(expression(+1))
+  ) +
+  annotate("text",
+    x = x1 + 0.07, y = (y0 + y1)/2 +.2, angle = 90, vjust = 0.5,
+    parse = TRUE, size = 3.6,
+    label = pm(bquote( hat(beta)[1] ~ "=" ~ .(round(b1, 2))))
+  ) +
+  geom_point(aes(x = x_demo, y = y_demo), color = "black", size = 2.5) +
+  geom_point(aes(x = x_demo, y = yhat_demo), color = "firebrick", size = 2) +
+  annotate("segment",
+    x = x_demo, xend = x_demo, y = y_demo, yend = yhat_demo, linewidth = 0.8, color = "firebrick"
+  ) +
+  annotate("text",
+    x = x_demo +.1, y = (y_demo + yhat_demo)/2 + 0.9, hjust = 0,
+    parse = TRUE, size = 3.9,
+    label = pm(bquote(Residual: ~ e[i] == y[i] - hat(y)[i] ~ "=" ~ .(round(res_demo, 2))))
+  ) +
+  annotate("label",
+    x = max(df$wt) - 0.7, y = min(df$mpg), hjust = 1,
+    parse = TRUE, size = 3.8, label.size = 0.25,
+    label = pm(bquote(hat(sigma)^2 == ("SS Resid")/(n - 2) ~ "=" ~ .(round(sigma2_hat, 2)) ~
+                      ";" ~~ hat(sigma) == .(round(sigma_hat, 2))))
+  ) +
+  labs(
+    x = "Weight (1000 lbs)",
+    y = "Miles per gallon",
+    title = "Annotated Simple Linear Regression",
+    subtitle = "&beta;<sub>0</sub> (intercept), &beta;<sub>1</sub> (slope), residuals *e*<sub>i</sub>, and error variance &sigma;<sup>2</sup>"
+  ) +
+  theme_minimal(base_size = 12)+ theme(
+  plot.subtitle = element_markdown()
+)
+#p
+```
+
+
+
+## More on `lm()` 
+###
+
+The result of `lm` is a special type of outcome called a model object. It only prints the estimates and summary info about the model. We can apply other functions to the model object to obtain detailed summary information. The two most important are `summary()` and `anova()`. 
+
+To examine this, let's look at a different example. Let's revisit the `stress` data from the `datarium` package. As a reminder, we have the following columns:
+
+- `id`: participant ID 
+- `score`: final stress score
+- `treatment`: `yes` = SKY, `no` = control 
+- `exercise`: additional condition of exercise regimen, `low`, `moderate`, or `high`
+- `age`: participant age 
+
+### 
+
+Let's test if there is any relationship between `age` and stress for these participants. Let's load the package, `glimpse` the data, and visualize the data first:
+
+
+```{r stress1, exercise = TRUE}
+library(datarium)
+glimpse(stress)
+```
+
+
+
+```{r stress2, exercise = TRUE}
+ggplot(stress, aes(x = age, y = score))+
+  geom_point(alpha = .8) + 
+  geom_smooth(method = "lm", se = FALSE)
+```
+
+### 
+
+Let's now fit an `lm()` of stress `score` "regressed on" `age`. Assign our model to an object called `fit`. Then, provide `fit` as an argument to the `summary` function. 
+
+```{r stress3, exercise = TRUE}
+___ <- lm(___, ___)
+___
+```
+
+```{r stress3-2, include= FALSE}
+fit <- lm(score ~ age, stress)
+```
+
+###
+
+There's a lot to interpret here, but you've probably seen most of these outputs when you ran regression in SPSS. Let's walk through it: 
+
+###
+
+* 5-number summary of the residuals: are they roughly symmetrical?
+
+This one is not provided as default in SPSS.
+
+```
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-14.8747  -5.7859   0.7786   5.7263  11.9618 
+```
+
+### 
+
+* Coefficients: usually what we are most interested in. We get the estimates of intercept and slope, as before. How do we interpret the estimates?
+
+```
+(Intercept)          age  
+    25.3551       0.9878  
+```
+
+### 
+
+We also get a standard error, a t-value, and `Pr(>|t|)`. Calling back to hypothesis testing, the estimated regression coefficients are themselves sample statistics, and sample statistics follow a sampling distribution. The variability of that sampling distribution comes from the estimated mean squared error and the size of the sample. 
+
+Under the null hypothesis, $H_0: \beta_k = 0$ for each $k$ regression parameter. 
+
+The $t value$ is a test statistic, similar to when we conducted a $t$ test. The $t$ is the estimate divided by its standard error. It tells us how far the estimate is from the null mean $0$, based on a $t$ distribution scaled to the SE. 
+
+###
+
+`Pr(>|t|)` is the p-value of the test $H_0: \beta_k = 0$. It is the probability of observing a coefficient as or more different from zero if this sample were taken from a population where the true regression parameter is actually zero. 
+
+pull up the summary one more time, and extract just the coefficients part with `$coefficients`: 
+
+```{r stress4, exercise = TRUE, exercise.setup = "stress3-2"}
+___(fit)$coefficients
+```
+
+
+```{r quiz1, echo = FALSE}
+question_text("What interpretation and inferences can we make about the coefficients?",
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 3)
+```
+
+###
+
+This information is identical to what's provided by SPSS:
+
+![](images/spss_regre1.png){width=80%}
+
+###
+
+Finally, we also get the residual standard error, the degrees of freedom, the $R^2$, and the $F$ statistic. 
+
+The residual standard error is the square root of the mean squared error we discussed before. If we calculated the predicted $\hat{y}$ for every point in the data, we could calculate 
+
+$$SSE = \sum_{i=1}{^n}{(y_i - \hat{y_i})^2}$$
+$$ MSE = \frac{SSE}{DF}$$
+where DF is the total number of independent observations minus the amount of "things" we estimate. For simple regression, this is $N - 2$ because we estimate two things (intercept and slope). 
+
+The MSE is our estimate of $\hat{\sigma^2}}$. The square root is $\hat{\sigma}$, which is the residual standard error given by `R` output. 
+
+### 
+
+The $R^2$ is the proportion of variance in $Y$ explained by the model as a whole. This information is also provided by SPSS: 
+
+![](images/spss_regre0.png){width=80%}
+
+You may recognize the $F$ statistic from when you learned ANOVA, but we didn't run an ANOVA here. What gives? Why is an $F$ reported here, and what does it mean? 
+
+### 
+
+The $F$ here tells us of the regression model as a whole significantly explains some of the variance in $Y$. In SPSS, we get this output:
+
+![](images/spss_anova.png){width=65%}
+
+In `R`, we can get more information with `anova(fit)`:
+
+```{r stress5, exercise = TRUE, exercise.setup = "stress3-2"}
+anova(fit)
+```
+
+###
+
+This tells us the overall sums of squares attributable to the `age` variable and SSE, MSE, and F. 
+
+## lm() with a categorical regressor
+### 
+
+[under construction]
+
+###
+
+```{r download-answers, child = system.file("child_documents/download_answers.Rmd", package = "tutorial.helpers")}
+```
