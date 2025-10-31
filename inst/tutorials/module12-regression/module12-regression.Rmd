@@ -172,7 +172,7 @@ In a regression model, we also obtain a special new estimate, $\hat{y_i}$. This 
 
 $$ \hat{y_i} = \hat{\beta_0} + \hat{\beta_1} x_i $$ 
 
-Here, and predicted value is denoted in red: 
+Here, a predicted value is denoted in red: 
 
 ![](images/regre_plot_5.png){width=95%}
 
