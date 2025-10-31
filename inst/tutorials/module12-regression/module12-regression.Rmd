@@ -187,7 +187,7 @@ A "residual" is the simply the difference between an observed $y$ and a predicte
 
 However, the regression line is designed to be the best line that cuts through the "cloud" of data points exactly, meaning that over all data points, the amount of errors "above" and "below" the line balance out. i.e., the residuals of all data points sum to exactly zero! 
 
-Instead, we use the sum of **squared** residuals to quantify the amount of error in the regression. This is often called sum of squared residuals or SSE for sum of squared errors, and is $ \sum_{i = 1}^{n} (y_i - \hat{y}_i)^2$
+Instead, we use the sum of **squared** residuals to quantify the amount of error in the regression. This is often called sum of squared residuals or SSE for sum of squared errors, and is $\sum_{i = 1}^{n} (y_i - \hat{y}_i)^2$
 
 ###
 
