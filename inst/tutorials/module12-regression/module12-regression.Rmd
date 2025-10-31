@@ -27,7 +27,7 @@ library(rstatix)
 library(ggpubr)
 library(tidyverse)
 library(tutorial.helpers)
-library(GGally)
+#library(GGally)
 options(repos = c(CRAN = "https://cran.rstudio.com"))
 if (!requireNamespace("gradethis", quietly = TRUE)) {
   learnr::tutorial_warning(
@@ -56,9 +56,9 @@ two_sample_long <- two_sample |>
   pivot_longer(cols = c(control, intervention), # or, cols = everything()
               values_to = "first_walk", names_to = "group")
 
-dat <- read_delim("~/Downloads/Tab10-2.txt", 
-    delim = "\t", escape_double = FALSE, 
-    trim_ws = TRUE)
+#dat <- read_delim("~/Downloads/Tab10-2.txt", 
+#    delim = "\t", escape_double = FALSE, 
+#    trim_ws = TRUE)
 
 
 ```
