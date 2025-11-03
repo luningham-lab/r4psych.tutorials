@@ -614,7 +614,7 @@ d_2 = 1 \text{ if } k_j = \text{"high",} \text{otherwise } 0 $$
 Then, the two dummy variables are the predictors in the regression:
 
 $$
-Y_i = \beta_0 + \beta_1 * d_{1i} + beta_2*d_{2i} + \varepsilon_i 
+Y_i = \beta_0 + \beta_1 * d_{1i} + \beta_2*d_{2i} + \varepsilon_i 
 $$
 Because the values of $d$ are limited to 0 and 1, the prediction model simplifies to:
 
