@@ -15,6 +15,7 @@ description: "Regression in R."
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
 library(MASS)
+library(jtools)
 library(infer)
 library(moderndive)
 library(learnr)
@@ -27,7 +28,8 @@ library(rstatix)
 library(ggpubr)
 library(tidyverse)
 library(tutorial.helpers)
-#library(GGally)
+library(datarium)
+library(GGally)
 options(repos = c(CRAN = "https://cran.rstudio.com"))
 if (!requireNamespace("gradethis", quietly = TRUE)) {
   learnr::tutorial_warning(
@@ -60,7 +62,8 @@ two_sample_long <- two_sample |>
 #    delim = "\t", escape_double = FALSE, 
 #    trim_ws = TRUE)
 
-
+attr(stress$score, "label") <- "Stress Score"
+attr(stress$age, "label") <- "Age"
 ```
 
 
@@ -433,12 +436,364 @@ anova(fit)
 
 This tells us the overall sums of squares attributable to the `age` variable and SSE, MSE, and F. 
 
+### Now what? 
+
+Traditionally, we look at $p$-values and $R^2$ to assess if our model has interesting individual effects and overall does an ok job at explaining the outcome. However, we will soon see some methods that focus more on $\hat{y}$, residuals, and MSE. 
+
+###
+
+We previously defined the calculation of $\hat{y}$:
+
+$$ \hat{y_i} = \hat{\beta_0} + \hat{\beta_1} x_i $$ 
+
+In our example, the average age is about 60, so based on our estimates, the average person has a $\hat{y}$ of 
+
+$$ 25.36 + 0.988 \times 60 = 84.64 $$ 
+
+### 
+
+$\hat{y}$ is referred to as the *predicted* value or the *fitted* value. 
+
+There are numerous ways to extract the fitted values in `R` without programming the calculations ourselves. The simplest is `predict(lm.object)`. Provide our `lm` result to `predict()` below.
+
+```{r predict1, exercise = TRUE, exercise.setup = "stress3-2"}
+predict(___)
+```
+
+These are also stored in the model object itself: 
+
+```{r predict2, exercise = TRUE, exercise.setup = "stress3-2"}
+fit$fitted.values
+```
+
+### 
+
+If we wanted to manually calculate the accuracy/inaccuracy of our model, we could also obtain residuals. We've learned many ways to program something like this, but here is a streamlined example:
+
+```{r predict3, exercise = TRUE, exercise.setup = "stress3-2"}
+stress |> mutate(residual = score - fit$fitted.values)
+```
+
+However, residuals are also stored in the `lm` object as well.
+
+```{r predict4, exercise = TRUE, exercise.setup = "stress3-2"}
+fit$residuals
+```
+
+### 
+
+There are two other convenience functions that make post-model-fitting analysis a little easier. The first is `augment()` from the `broom` package. `augment()` takes the model object as its argument. 
+
+```{r predict5, exercise = TRUE, exercise.setup = "stress3-2"}
+library(broom)
+augment(___)
+```
+
+The information contained here is
+
+| Output       | Value       |
+| ------ |---------------| 
+| .cooksd	| Cook's distance, how much the model fitted values would change if that observation were removed |
+| .fitted	|  Fitted or predicted value. |
+| .hat	| Diagonal of the hat matrix. |
+| .lower | Lower bound on interval for fitted values. |
+| .resid	|  The difference between observed and fitted values. |
+| .se.fit	| Standard errors of fitted values. |
+| .sigma	| Estimated residual standard deviation when corresponding observation is dropped from model. |
+| .std.resid	|  Standardised residuals. |
+| .upper	|  Upper bound on interval for fitted values. | 
+
+
+###
+
+The second is `get_regression_points()` from the `moderndive` library. Its output is a little simpler. 
+
+```{r predict6, exercise = TRUE, exercise.setup = "stress3-2"}
+library(moderndive)
+get_regression_points(___)
+```
+
+### 
+
+How might we use the residuals? You may have heard of regression "diagnostic" plots previously, which are sometimes used for models with a few predictors. There are usually three things we might look for: 
+
+1. unexpected residual patterns (checking for constant variance)
+2. normally distributed residuals 
+3. overly influential data points 
+
+1 and 2 correspond to the assumption that $\varepsilon_i \sim N(0, \sigma^2)$ 
+
+### Constant error variance
+
+When we plot the residuals against the fitted values, we expect the residuals to have a mean of zero and constant variance across the range of fitted values. How might we plot this with `ggplot`?
+
+```{r predict7, exercise = TRUE, exercise.setup = "stress3-2"}
+augment(fit) |>
+  ggplot(aes(x = .fitted, y = .resid)) +
+  geom____() + 
+  geom_hline(yintercept = 0, color = "darkred")
+```
+
+We want the scatterpoints to be approximately centered around 0 at the y-axis and to not display a pattern of increasing, decreasing, or widening/narrowing over the range of `x`. 
+
+### 
+
+We also sometimes plot the residuals against individual predictors to see which may contribute to any odd residuals, but in simple regression, this looks the exact same because we only have one predictor. 
+
+```{r predict7-2, exercise = TRUE, exercise.setup = "stress3-2"}
+augment(fit) |>
+  ggplot(aes(x = age, y = .resid)) +
+  geom_point() + 
+  geom_hline(yintercept = 0, color = "darkred")
+```
+
+### Normality 
+
+We can visually check for severe violations of normality with our Q-Q Plot using the `ggqqplot` function from `ggpubr`. 
+
+```{r predict8, exercise = TRUE, exercise.setup = "stress3-2"}
+library(ggpubr)
+augment(fit) |> ggqqplot(x = ".resid")
+```
+
+### Influential data points 
+
+Cook's d is a measure of the influence of each individual plot, quantifying how much the predicted values would change if a single datapoint were removed. 
+
+Imagine we have an outlier data point, this can significantly alter the slope of the regression line: 
+
+```{r, echo = F, message = F, warning = F, comment = ""} 
+library(patchwork)
+p1<-ggplot(stress, aes(x = age, y = score))+
+    geom_point(alpha = .8) + 
+    geom_smooth(method = "lm", se = FALSE)
+
+stress2 <- stress
+stress2[55, "score"] <- 120
+
+p2 <- ggplot(stress2, aes(x = age, y = score))+
+    geom_point(alpha = .8) + 
+    geom_smooth(method = "lm", se = FALSE)
+
+p1 + p2 + plot_annotation(title = "Linear association without (left) and with (right) outlier") + plot_layout(axes = "collect_y") & ylim(65, 120)&theme_pubr()
+```
+
+### 
+
+A general rule of thumb is that Cook's d greater than 1.0 is a potentially influential datapoint. We can plot it as a bar plot with `stat = "identity"`:
+
+```{r predict9, exercise = TRUE, exercise.setup = "stress3-2"}
+augment(fit) |>
+    ggplot(aes(x = seq_along(.cooksd), y = .cooksd)) +
+    geom_col() + #shortcut for geom_bar(stat="identity")
+    labs(x = "Row #", y = "Cook's distance")
+```
+
+###
+
+Overall, these model results look fine given $N = 60$. 
+
 ## lm() with a categorical regressor
 ### 
 
-[under construction]
+Recall that the interpretation of $\beta_1$ is the change in $Y$ per one unit change in $X$. Often, our $X$ of interest is categorical and does not have units. Consider our `stress` data: we also have the `exercise` condition, which is "low", "moderate", and "high". 
+
+If we want to predict stress from exercise level, how does the regression model handle this? 
+
+### 
+
+Briefly, categorical variables need to be recoded to dummy variables. These dummy codes add meaning to the idea of a "one unit increase". 
+
+If we have a variable with $k$ categories, then we need to select one reference category and create $k - 1$ dummy variables. For our example with $k =3$, we need two variables such that:
+
+$$ d_1 = 1 \text{ if } k_j = \text{"moderate",} \text{otherwise } 0 \\
+d_2 = 1 \text{ if } k_j = \text{"high",} \text{otherwise } 0 $$
+ 
+###
+
+Then, the two dummy variables are the predictors in the regression:
+
+$$
+Y_i = \beta_0 + \beta_1 * d_{1i} + beta_2*d_{2i} + \varepsilon_i 
+$$
+Because the values of $d$ are limited to 0 and 1, the prediction model simplifies to:
+
+$$
+\hat{Y_i} = 
+\begin{cases}
+\hat{\beta_0} & \text{if } k_j = \text{ "low"} \\\\
+\hat{\beta_0} + \hat{\beta_1} & \text{if } k_j = \text{ "moderate"} \\\\
+\hat{\beta_0} + \hat{\beta_2} & \text{if } k_j = \text{ "high"} \\\\
+\end{cases}
+$$
+
+with no other variables in the model, the interpretation is:
+
+* $\hat{\beta_0}$ is the average stress score for the "low" group (reference group)
+* $\hat{\beta_1}$ is the average stress score *difference* between the "low" and "moderate" exercise groups
+* $\hat{\beta_2}$ is the average stress score *difference* between the "low" and "high" exercise groups
+
+limitation: we would need to re-configure the dummy codes and re-fit the model to obtain a direct head-to-head comparison between "moderate" and "high".
+
+### 
+
+Thankfully, the `lm` function will internally handle the dummy coding of character or factor variables! Let's test it out. Fit the regression to stress `score` predicted by `exercise`, and call it `fit2`. Then check out the `summary`. 
+
+```{r cat1, exercise = TRUE}
+
+
+```
+
+```{r cat1-1, include=F}
+fit2 <- lm(score ~ exercise, stress)
+```
+
+
+### 
+
+The residual plots are a little harder to diagnose for categorical variables, but let's take a look. 
+
+```{r cat2, exercise = TRUE, exercise.setup= "cat1-1"}
+augment(fit2) |>
+  ggplot(aes(x = exercise, y = .resid)) +
+  geom_point() + 
+  geom_hline(yintercept = 0, color = "darkred")
+```
 
 ###
+
+The levels of exercise are ordered, could we recode exercise to 1, 2, 3? Why or why not? 
+
+Let's see what happens: below we recode the factor and scale it so 0 is "low". Then save the model `fit3` and look at the summary. 
+
+```{r cat3, exercise = TRUE, exercise.setup= "cat1-1"}
+as.numeric(stress$exercise)
+stress <- stress |>mutate(exercise2 = as.numeric(exercise)-1)
+fit3<-lm(score ~ exercise2, stress)
+
+```
+
+Let's compare the model output (and also recall how to use `broom::tidy()` and `rempsyc::nice_table()`): 
+
+```{r cat4, exercise = TRUE, exercise.setup= "cat1-1"}
+tidy(fit2) |> nice_table()
+```
+
+```{r cat5, exercise = TRUE, exercise.setup= "cat3"}
+tidy(fit3) |> nice_table()
+```
+
+###
+
+The first model uses dummy codes specification, the second model treats exercise as linear, such that increasing from a lower to higher exercise category has a stepwise increase. The predicted values for each model are: 
+
+| Level       | predicted      |
+| --------- |---------------------| 
+| Low, mdl1	| $\hat{\beta_0} = 88.72$ | $\hat{\beta_0} = 90.41$ |
+| Low, mdl2	|  $\hat{\beta_0} = 90.41$ |
+| Moderate, mdl1	| $\hat{\beta_0} - \hat{\beta_1} = 88.7 - 0.6 = 88.1$  
+| Moderate, md2 | $\hat{\beta_0} - \hat{\beta_1}*1  = 90.41 - 5.92 = 84.57$ |
+| High, mdl1	| $\hat{\beta_0} - \hat{\beta_2} = 88.7 - 11.83 = 76.89$  
+| High, mdl2 | $\hat{\beta_0} - \hat{\beta_1}*2  = 90.41 - 5.92*2 = 78.65$ |
+
+### 
+
+The second model contrains the effect to be perfectly linear and stepwise. This most impacts the moderate group, which is truly not different from the low group in the first model. The second model also has more error for the "low" and "high" groups: 
+
+```{r cat6, exercise = TRUE, exercise.setup= "cat3"}
+stress |> group_by(exercise) |> summarize(mean(score))
+```
+
+The actually group means corresponse to model 1. 
+
+###
+
+The `anova` function with one categorical predictor provides the type of output we would expect from one-way ANOVA: 
+
+```{r cat7, exercise = TRUE, exercise.setup= "cat1-1"}
+anova(fit2)
+```
+
+For the sake of time, we will forego a detailed discussion of ANOVA as a separate method. 
+
+## Regression prediction plots 
+###
+
+Before moving to multiple regression, I want to briefly introduce some post-analysis tools and shortcuts for visualizing regression models. 
+
+A simple Google search or ChatGPT prompt of "what are some convenient R packages for visualizing predicted values from a regression model?" will provide numerous resources, but one of my go-to's is described here. This function is `effect_plot()` from the package `jtools`. This package is written by an indpendent programmer named Jacob Long and contains several convenience functions for common model-fitting tasks in `R`. 
+
+### 
+
+First, let's examine the `effect_plot`. You need to provide the fitted model object and the predictor name for the `pred` argument. Let's start with our first model, `fit`.
+
+```{r plot1, exercise = TRUE, exercise.setup = "stress3-2"}
+#install.packages("jtools") #included in class package 
+library(jtools)
+effect_plot(fit, pred = age)
+```
+
+###
+
+The linear predictor itself doesn't provide a ton of information. We should add the points themselves and the prediction interval. These arguments are `interval = TRUE` and `plot.points = TRUE`.
+
+```{r plot2, exercise = TRUE, exercise.setup = "stress3-2"}
+effect_plot(fit, pred = age, ___, ___)
+```
+
+###
+
+Another useful option is called a "rug plot", which adds line ticks across the `x` and `y` axes to show where datapoints gather along the distribution of each variable. 
+
+```{r plot3, exercise = TRUE, exercise.setup = "stress3-2"}
+effect_plot(fit, pred = age, interval=TRUE, rug = TRUE)
+```
+
+### 
+
+`effect_plot` is useful for categorical predictors as well. Let's examine `fit2`. 
+
+```{r plot4, exercise = TRUE, exercise.setup= "cat1-1"}
+effect_plot(fit2, pred = exercise)
+```
+
+The interval is automatically included.
+
+### 
+
+Let's add the points as well:
+
+
+```{r plot5, exercise = TRUE, exercise.setup= "cat1-1"}
+effect_plot(fit2, pred = exercise, plot.points = TRUE)
+```
+
+### 
+
+Adding a little jitter is probably useful for categorical variables. 
+
+```{r plot6, exercise = TRUE, exercise.setup= "cat1-1"}
+effect_plot(fit2, pred = exercise, 
+            plot.points = TRUE,
+            jitter = .1)
+```
+
+`cat.geom` allows us to control the type of plot specifically for categorical predictors. The other options are "line" and "bar", though "bar" is usually not recommended. 
+
+```{r plot7, exercise = TRUE, exercise.setup= "cat1-1"}
+effect_plot(fit2, pred = exercise, 
+            plot.points = TRUE,
+            jitter = .1, 
+            cat.geom = "line")
+
+effect_plot(fit2, pred = exercise, 
+            plot.points = TRUE,
+            jitter = .1, 
+            cat.geom = "bar")
+```
+
+The only major limitation of `effect_plot` is that it doesn't have internal mapping of the groups to the `fill` aesthetic. 
+
 
 ```{r download-answers, child = system.file("child_documents/download_answers.Rmd", package = "tutorial.helpers")}
 ```

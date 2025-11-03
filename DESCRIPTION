@@ -33,6 +33,9 @@ Imports:
     ggpubr,
     rstatix,
     Hmisc,
-    ggcorrplot
+    ggcorrplot,
+    GGally,
+    jtools,
+    sjplot
 Remotes:
     rstudio-education/gradethis
