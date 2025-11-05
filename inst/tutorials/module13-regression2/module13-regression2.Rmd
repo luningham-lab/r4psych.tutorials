@@ -1,0 +1,486 @@
+---
+title: "Crash course on multiple regression and ANOVA in R"
+tutorial:
+  id: "module13-regression2"
+  name: "Regression in R"
+output: 
+  learnr::tutorial:
+    progressive: true
+    allow_skip: true
+runtime: shiny_prerendered
+author: Justin Luningham
+description: "Regression in R."
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(MASS)
+library(car)
+library(afex)
+library(kableExtra)
+library(jtools)
+library(infer)
+library(moderndive)
+library(learnr)
+library(report)
+library(rempsyc)
+library(broom)
+library(data.table)
+library(flextable)
+library(rstatix)
+library(ggpubr)
+library(tidyverse)
+library(tutorial.helpers)
+library(datarium)
+library(GGally)
+options(repos = c(CRAN = "https://cran.rstudio.com"))
+if (!requireNamespace("gradethis", quietly = TRUE)) {
+  learnr::tutorial_warning(
+    "This tutorial uses the **gradethis** package to provide feedback.  
+    It looks like you don’t have gradethis installed yet.  
+    Please run this in your console:
+    
+    remotes::install_github('rstudio-education/gradethis')"
+  )
+} else {
+  library(gradethis)
+  gradethis::gradethis_setup()  # optional: standardizes grading defaults
+}
+
+set.seed(144445)
+one_sample <- tibble(first_walk = round(rnorm(50, 12.8, 2.5),1))
+raw_pairs<-mvrnorm(25, mu = c(14, 12.8), Sigma = cbind(c(2.5, 1), c(1, 2.5)))
+
+paired_samples <- tibble(sib1 = round(raw_pairs[,1],1), sib2 = round(raw_pairs[,2],1), famID=1:25)
+
+paired_long <-paired_samples |> pivot_longer(cols = c(sib1, sib2), values_to = "first_walk", names_to = "sibling")
+
+two_sample<-tibble(control = round(rnorm(50, 14, 2.5),1), intervention = round(rnorm(50, 13, 2.5 ),1))
+
+two_sample_long <- two_sample |> 
+  pivot_longer(cols = c(control, intervention), # or, cols = everything()
+              values_to = "first_walk", names_to = "group")
+
+#dat <- read_delim("~/Downloads/Tab10-2.txt", 
+#    delim = "\t", escape_double = FALSE, 
+#    trim_ws = TRUE)
+
+attr(stress$score, "label") <- "Stress Score"
+attr(stress$age, "label") <- "Age"
+
+#contrasts(stress$treatment) <- contr.sum(2)
+#contrasts(stress$exercise) <- contr.sum(3)
+
+fit0 <- lm(score ~ age, stress)
+
+mod<- lm(score ~ age + treatment, stress)
+fit1 <- lm(score ~ treatment + exercise + age, stress)
+```
+
+
+```{r info-section, child = system.file("child_documents/info_section.Rmd", package = "tutorial.helpers")}
+```
+
+
+## Multiple Regression
+###
+
+In practice, we rarely rely on simple regression models alone - psychological and behavioral research is much more complex than that. Of course, *multiple regression* extends the linear model to handle multiple predictors. 
+
+Multiple regression still requires independent observations, or one row per person and only one outcome $Y$. However, we can include multiple $X$ terms. The most basic form has two predictors: 
+
+###
+
+$$ Y_i = \beta_0 + \beta_1 X_{1i} + \beta_2 X_{2i}+ \varepsilon_i$$ 
+$Y_i$ is still the outcome variable for person $i$ and $\varepsilon_i$ is still the error for each person, assumed to follow a normal distribution with mean of 0 and constant variance. The intercept is now the expected value of $Y$ when *both* $X$ variables equal 0. 
+
+###
+
+$\beta_1$ is the expected change in $Y$ per one unit change in $X_1$, *controlling for* $X_2$. Statistically, this means we examine how $Y$ changes as $X_1$ changes if we could somehow make $X_1$ vary while keeping $X_2$ fixed. 
+
+###
+
+Imagine if we took out the part of $X_2$ that overlaps with both $Y$ and $X_1$, and then did the regression on these unique parts of $Y$ and $X_1$. This is the regression coefficient obtained in multiple regression.
+
+$\beta_1$ can also be thought of as the expected change in $Y$ per unit change in $X_1$ at a fixed value of $X_2$, with the caveat that the effect of $X_1$ is constant across all values of $X_2$.
+
+### 
+
+Let's examine this explicitly in `R`. As an example, we will revisit the `stress` study from the `datarium` package. Let's look at the effect of both `age` and `treatment` on the stress `score`. We can simply add terms in the `formula` portion of the model with `+`. 
+
+```{r reg1, exercise = TRUE}
+fit0 <- lm(score ~ age, stress)
+tidy(fit0)
+mod<- lm(score ~ age + treatment, stress)
+tidy(mod)
+```
+
+### 
+
+Accounting for effect of treatment, one year increase in age leads to an expected 0.934 unit increase in stress. When comparing two people from the control group that are one year apart, their expected difference in stress is 0.934. This same difference is expected for two people from the treatment group. 
+
+Note that the esimated effect for age is somewhat different. This is because there is some overlap between treatment and stress and/or treatment and age. Adding the treatment variable adjusts for this overlap.
+
+### 
+
+Let's use some quick programming to demonstrate the definition of the controlled effect being "the regression on the unique parts of $Y$ and $X_1$."
+
+```{r reg2, exercise = TRUE, exercise.setup = "reg1"}
+# Residualize stress on treatment - 
+#this is what's left over in score after X2
+rY <- lm(score ~ treatment, data = stress)$residual
+# Residualize age on treatment - the part of X1 separate from X2 
+rX <- lm(age ~ treatment, data = stress)$residual
+
+tidy(lm(rY ~ rX)) |> filter(term == "rX")
+tidy(mod)|> filter(term == "age")
+```
+
+(The standard error changes slightly because of the original model and the `rX` model having different degrees of freedom.)
+
+```{r quiz1, echo = FALSE}
+question_text("Notes to self on residualized model interpretation (optional)",
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 3)
+```
+
+This illustrates that in multiple regression, the coefficients are actually "partial regression coefficients," or the simple association fitted to "parts" of the data after adjusting for other variables.
+
+
+###
+
+Let's use multiple regression to investigate the stress data further. Below, I introduce the function `ggpairs` from the `GGally` library. This is like the base function `pairs` for visualization multiple bivariate relationships, but it's enhanced a bit: 
+
+```{r reg3, exercise = TRUE}
+library(GGally)
+ggpairs(stress)
+```
+
+### 
+
+As we increase variables, the relationships become a bit harder to see. The `id` variable doesn't really make sense, so let's remove that column before `ggpairs` with some piping.
+
+```{r reg4, exercise = TRUE}
+library(GGally)
+stress |> ___() |> ___()
+```
+
+###
+
+We can also make the axis labels a little easier to see. One option is to add them to the diagonal with `axisLabels = "internal"` argument. 
+
+###
+
+Let's examine the effects of both treatment and exercise, accounting for age. We can add all three terms to the `formula` part of `lm`. As in our last module, this will add two dummy variables for moderate or high exercised compared to low exercise. 
+
+```{r reg5, exercise = TRUE}
+fit1 <- lm(___, stress)
+tidy(fit1)
+```
+
+```{r reg5-2, include = F}
+fit1 <- lm(score ~ treatment + exercise + age, stress)
+mod<- lm(score ~ age + treatment, stress)
+#tidy(fit1)
+```
+
+```{r quiz2, echo = FALSE}
+question_text("Notes to self on fit1 model interpretation:",
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 3)
+```
+
+
+###
+
+Interpretation:
+
+* SKY treatment leads to reduced stress, controlling for age and exercise level: 4.33 lower stress on average
+* high levels of exercise reduce stress compared to low exercise, adjusting for age and SKY effects: 9.62 lower stress on average
+* no difference between moderate and low exercise 
+* stress increases with age, regardless of treatment or exercise: about 0.5 points per year
+
+### 
+
+Before diving deeper into interpreting this model, we need to ask the question: "is this model actually better than the first one?", i.e., does adding `exercise` improve the model fit? 
+
+We have a hint that the answer is yes because of the significant coefficients, but the two classical ways to determine this are 1) a global model comparison, seeing if the overall fit of the second model is significantly better than the first, and 2) improvements in *adjusted* $R^2$. 
+
+### Likelihood Ratio Test
+
+To test overall model comparisons, we can use the `anova()` function to perform a **likelihood ratio test**. This computes the ratio of the sums of squares due to regression for the larger model compared to the sums of squares due to the regression for the smaller model. The null hypothesis is that *both models fit the same*, so the ratio is expected to be 1. A significant $p$-value indicates that the model fit is significantly different. 
+
+### 
+
+One methodological thing to note here: adding predictors will never result in *worse* model fit, even if the new predictor has zero true relationship with $Y$. The new variable will help reduce the unexplained part of $Y$, even if just by chance and sampling fluctuation. 
+
+So, the variation explained by the larger and smaller models has to be adjusted by their *degrees of freedom* take up by the model - the number of things they estimate. The likelihood ratio test is adjusted by $\Delta df$, the *difference* in degrees of freedom between the models. 
+
+### 
+
+Below, run the `anova` function on the two models `mod, fit1` ("smaller" model first).
+
+```{r reg6, exercise = TRUE, exercise.setup = "reg5-2"}
+
+```
+
+```{r quiz3, echo = FALSE}
+question_text("Notes to self on interpreting the likelihood ratio test for our two models:",
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 3)
+```
+
+### adjusted $R^2$
+
+The other tool for comparing models is adjusted $R^2$. Recall that $R^2$ is the proportion of the variance in $Y$ that is accounted for by the model. When comparing two models, we examine if the larger model with more terms added results in a meaningful larger $R^2$. 
+
+As we just laid out above, adding predictors will always increase the sums of squares explained by the model, even if just by chance. Similarly, $R^2$ will never get worse as predictors are added to a prior model. 
+
+Adjusted $R^2$ is simply a modified calculation that takes into account the total number of predictors in the model. Adjusted $R^2$ *can* decrease if predictors with no real effect are added to a model. Therefore, adjusted $R^2$ is a better tool to judge model comparisons. 
+
+###
+
+$R^2$ and adjusted $R^2$ are given by the `summary()` function. We can also extract specific elements using the `$` operator to avoid large outputs. 
+
+```{r reg7, exercise = TRUE, exercise.setup = "reg5-2"}
+summary(mod)$adj.r.squared
+summary(fit1)$adj.r.squared
+```
+
+###
+
+All considered, we can see that adding exercise provides a substantial improvement to model fit. The $R^2_{adj}$ increases by 26% when adding exercise! These three variables explain 57.6% of the variance in stress.
+
+(note that this is much higher than we typically expect in psychology: usually 0.02, 0.13, 0.25 are considered small, medium, and large)
+
+### Model plots
+
+Let's look at some ways to interpret our model effects. Last time we leared about `effect_plot()` from the `jtools` library. This will help to plot effects of each variable: 
+
+```{r reg8, exercise = TRUE, exercise.setup = "reg5-2"}
+library(jtools)
+effect_plot(fit1, 
+            pred =___,  #start with age
+            interval = TRUE, plot.points = TRUE
+            )
+effect_plot(fit1, 
+           pred = ___, #exercise
+           ___, #same options as above
+           jitter=.1)
+```
+
+Hm. The regression line for age and the predicted mean for some exercise groups does not seem to align with the data. What's going on? 
+
+
+### 
+
+The regression line and predicted group means depicted here are calculated after controlling for the other variables in the model; however, the data points reflect the raw data. 
+
+An alternative (and pretty cool) way to look at the effect of each variable is with plots called *partial residual plots*, or sometimes referred to as "component plus residual" plots. These plot the model residuals plus the effect of a single predictor variable rather than the original data. 
+
+###
+
+Here are sompe plots and accompanying code to demonstrate this concept: 
+
+```{r, echo = T}
+effect_plot(fit0, pred = age,plot.points = T) + 
+  annotate("label",x = 70 - 0.7, y = 88, hjust = 0,size = 3.8,
+           label = str_wrap("Linear predictor of age to stress in the simple regression model, where age is the only predictor", 
+                            width=23))
+
+effect_plot(fit1, pred = age, plot.points = T) + 
+  annotate("label",x = 70 - 0.7, y = 84, hjust = 0,size = 3.8,
+           label = str_wrap("Linear predictor of age to stress (original scores) in the multiple regression model", 
+                            width=23))
+
+effect_plot(fit1, pred = age, plot.points = T, 
+            partial.residuals = T, 
+            colors="firebrick4") + 
+  annotate("label",x = 70 - 0.7, y = 83, hjust = 0,size = 3.8,
+           label = str_wrap("Linear predictor of age to the partial residuals,
+                            adjusting for effects of treatment + exercise", 
+                            width=23)) + ylim(c(65,100))
+```
+
+
+```{r quiz4, echo = FALSE}
+question_text("Notes to self on `effect_plot()` results:",
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 3)
+```
+
+
+###
+
+Let's see what the partial residual plot looks like for exercise:
+
+```{r reg9, exercise = TRUE, exercise.setup = "reg5-2"}
+effect_plot(fit1, 
+           pred = ___, 
+           ___)
+```
+
+That makes a lot more sense. 
+
+###
+
+Let's also plot the predicted `treatment` effect from our model: 
+
+```{r reg10, exercise = TRUE, exercise.setup = "reg5-2"}
+
+```
+
+### 
+
+Finally, let's look at another way to interpret model effects called *estimated marginal means* (EMM). The marginal mean is the average value of $Y$ for one particular predictor, averaging over the other predictor(s). EMMs calculate these marginal mean values from a particular model, including the estimated effects of all variables and the estimated error variance. 
+
+In our example, EMMs entail calculating the predicted means for treatment = no and treatment = yes groups *after adjusting for the other variables*. This is different from looking at the means of treatment groups in the data overall. 
+
+###
+
+One convenient package to do this in `R` is called `emmeans`. It can extract marginal mean values from many different types of models, but it is particularly useful for `lm` and ANOVA models. Below, we'll look at the means of exercise from the model compared to the means of the original (unadjusted) data.
+
+`emmeans` requires the model fit object and some kind of specification. This can be a character vector of variables for EMMs or a formula specification. 
+
+```{r reg11, exercise = TRUE, exercise.setup = "reg5-2"}
+library(emmeans)
+emmeans(fit1, "treatment")
+emmeans(fit1, ~ treatment) #equivalent
+
+##compare to raw summary data
+stress |> 
+  ___ > 
+  ___(mean(score),sd(score)/sqrt(60))
+
+```
+
+The adjusted estimates are not far from the raw variables.
+
+###
+
+How about for exercise:
+
+```{r reg12, exercise = TRUE, exercise.setup = "reg5-2"}
+library(emmeans)
+emmeans(fit1, ~ exercise) 
+stress |> group_by(exercise) |> 
+  summarize(mean(score))
+```
+
+A little more adjustment here. 
+
+###
+
+Partial residual plots can help us to identify areas of misfit, such as predictors where the association may be non-linear when the partial residuals do not align with the linear trend. 
+
+For completeness, we can also check the residuals against the fitted values as before. We hope to see residuals centered around zero with a contant amount of variation over the range of x. 
+
+What function did we learn last time for extracting model fit information, such as predicted values and residuals?
+
+```{r reg13, exercise = TRUE, exercise.setup = "reg5-2"}
+___(fit1) |>
+  ggplot(aes(x = .fitted, y = .resid))+
+  geom_point() +geom_smooth(method = "lm")
+
+___(fit1) |>
+    ggplot(aes(x = seq_along(.cooksd), y = .cooksd)) +
+    geom_col()
+```
+
+The 51st row is more influential than others, but the Cook's Distance is not particularly large.
+
+## Interaction Effects (moderation) & ANOVA
+###
+
+Suppose the researcher originally proposed that regular exercise would actually enhance the SKY intervention regimen - in other words, exercise will modify the treatment effect. 
+
+Statistically, the researcher is proposing an interaction effect between the two variables, also called moderation. A significant interaction means that the effect of one variable changes as a function of the other variable. 
+
+###
+
+Below, fit a new `lm` model, but in the formula, include `treatment * exercise` instead of `treatment + exercise`. Call the new fit object `fit2`. Then, view the summary of the result. 
+
+```{r int1, exercise = TRUE}
+fit1 <- lm(score ~ treatment + exercise + age, stress)
+```
+
+There are some critical issues to note here: 
+
+* notice that we have several different "pieces" of the interaction effect that we are after - `lm` runs a series of tests on very specific comparisons of levels of the factors using internal contrast codes for each cross-tabulation of the factor
+* that's complex, but the take-home is that the overarching question of "is the effect of treatment different at different levels of exercise" is a *joint* hypothesis, and it cannot be answered by a single effect comparison
+
+To conduct a *joint* test for interactions between categorical variables, we need to use ANOVA methods.
+
+###
+
+The default `anova()` function is actually not appropriate for most ANOVA analyses - this is one major limitation of `R` compared to other software. Without getting too far into the weeds...there are several ways to calculate the sums of squares for a model with categorical predictors. The primary ones are called Type I, II, and III sums of squares. Type I is considered the worst option, but it is the only method available in `anova(lm())`. 
+
+One option is to, use the `Anova()` function from `car` package. This has arguments of `type = 2` or `type = 3`, which are the correct ways to calculate sums of squares. 
+
+Another option is to use a package designed for ANOVA/ANCOVA models. One that I like is called `afex`. It has a few different primary functions, but the `aov_ez()` function is mean to provide an easy interface for ANOVA models. It requires an ID column, even for a fully between-subjects design, but otherwise is pretty simple. The main arguments are:
+
+```
+aov_ez(
+id, dv, #characters
+data, 
+between = NULL, #character or character vector
+within = NULL, 
+covariate = NULL, 
+factorize = TRUE # F if covariate is continuous
+)
+```
+
+### 
+
+Let's apply it to our data: 
+
+```{r int2, exercise = TRUE}
+fit3 <- aov_ez(
+  "id", "score", stress,
+  between = c("treatment","exercise"),
+  covariate = "age",
+  factorize = FALSE
+)
+fit3
+```
+
+###
+
+We get the overall test for each factor (called main effects) and the joint test of the interaction. 
+
+**Important: we always interpret the interaction in the overall $F$ test first.** If the interaction is significant, the main effects are not interpretable on their own. 
+
+###
+
+* further, regression coefficients can change depending on how the internal factor coding is assigned
+* instead, we can conduct the tests in a different way - comparing the "cell means" of stress, where a cell is the combination of treatment $\times$ exercise:
+
+| **Treatment** | **Low Exercise** | **Moderate Exercise** | **High Exercise** |
+|--------------|------------------|-----------------------|------------------|
+| **No**       | μ<sub>No,Low</sub>        | μ<sub>No,Mod</sub>         | μ<sub>No,High</sub>       |
+| **Yes**      | μ<sub>Yes,Low</sub>       | μ<sub>Yes,Mod</sub>        | μ<sub>Yes,High</sub>      |
+
+(note: in our model, the μ's are "age-adjusted")
+
+* the cell means comparisons do *not* depend on how the factors are coded internally 
+
+### 
+
+[under construction]
+
+###
+
+```{r download-answers, child = system.file("child_documents/download_answers.Rmd", package = "tutorial.helpers")}
+```
