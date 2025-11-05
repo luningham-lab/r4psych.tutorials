@@ -35,6 +35,8 @@ Imports:
     Hmisc,
     ggcorrplot,
     GGally,
-    jtools
+    jtools,
+    afex,
+    car
 Remotes:
     rstudio-education/gradethis
