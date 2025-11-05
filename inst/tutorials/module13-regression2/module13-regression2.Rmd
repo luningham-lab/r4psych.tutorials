@@ -210,24 +210,31 @@ Interpretation:
 
 Before diving deeper into interpreting this model, we need to ask the question: "is this model actually better than the first one?", i.e., does adding `exercise` improve the model fit? 
 
-We have a hint that the answer is yes because of the significant coefficients, but the two classical ways to determine this are 1) a global model comparison, seeing if the overall fit of the second model is significantly better than the first, and 2) improvements in *adjusted* $R^2$. 
+We have a hint that the answer is yes because of the significant coefficients, but the two classical ways to determine this are 1) a global model comparison, seeing if the overall fit of the second model is significantly better than the first, conducted by 1a) an $F$ test or 1b) a likelihood ratio test, and 2) improvements in *adjusted* $R^2$. 
 
-### Likelihood Ratio Test
+### F test
 
-To test overall model comparisons, we can use the `anova()` function to perform a **likelihood ratio test**. This computes the ratio of the sums of squares due to regression for the larger model compared to the sums of squares due to the regression for the smaller model. The null hypothesis is that *both models fit the same*, so the ratio is expected to be 1. A significant $p$-value indicates that the model fit is significantly different. 
+To test overall model comparisons, we can use the `anova()` function to calculate an $F$ test of overall model fit comparisons. This computes the increase in squared errors relative to the increase in degrees of freedom divided by the full model's mean squared error. The null hypothesis is that *both models fit the same*, so the ratio is expected to be 1. A significant $p$-value indicates that the model fit is significantly different. 
 
 ### 
 
 One methodological thing to note here: adding predictors will never result in *worse* model fit, even if the new predictor has zero true relationship with $Y$. The new variable will help reduce the unexplained part of $Y$, even if just by chance and sampling fluctuation. 
 
-So, the variation explained by the larger and smaller models has to be adjusted by their *degrees of freedom* take up by the model - the number of things they estimate. The likelihood ratio test is adjusted by $\Delta df$, the *difference* in degrees of freedom between the models. 
+So, the variation explained by the larger and smaller models has to be adjusted by their *degrees of freedom* taken up by the model - the number of things it estimates. The difference in degrees of freedom between the models is denoted $\Delta df$. 
+
+### Likelihood ratio test
+
+The likelihood ratio test (LRT) is more flexible than the $F$ test, but it has the same goals. The $F$ test applies to models estimated with ordinary least squares, which is used for the general linear model. The likelihood ratio test is based on maximum likelihood estimation, which is more flexible and can be used for generalized linear models and mixed-effects models.
+
+Note for both approaches, the models need to be nested, meaning one model is a subset of the other. Usually, this means that one can arrive at the simpler model by setting one or more parameters of the full model to zero.
 
 ### 
 
-Below, run the `anova` function on the two models `mod, fit1` ("smaller" model first).
+Below, run the `anova` function on the two models `mod, fit1` ("smaller" model first). For the LRT, add the argument `test = "LRT"`. 
 
 ```{r reg6, exercise = TRUE, exercise.setup = "reg5-2"}
-
+anova(mod, fit1)
+anova(mod, fit1, test = "LRT")
 ```
 
 ```{r quiz3, echo = FALSE}
