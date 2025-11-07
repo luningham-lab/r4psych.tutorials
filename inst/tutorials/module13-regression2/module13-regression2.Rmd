@@ -16,6 +16,7 @@ description: "Regression in R."
 knitr::opts_chunk$set(echo = FALSE)
 library(MASS)
 library(car)
+library(emmeans)
 library(afex)
 library(kableExtra)
 library(jtools)
@@ -75,6 +76,15 @@ fit0 <- lm(score ~ age, stress)
 
 mod<- lm(score ~ age + treatment, stress)
 fit1 <- lm(score ~ treatment + exercise + age, stress)
+
+fit3 <- aov_ez(
+  "id", "score", stress,
+  between = c("treatment","exercise"),
+  covariate = "age",
+  factorize = FALSE
+)
+
+gss_dat <- GSSvocab |> filter(year == "2016")
 ```
 
 
@@ -210,27 +220,43 @@ Interpretation:
 
 Before diving deeper into interpreting this model, we need to ask the question: "is this model actually better than the first one?", i.e., does adding `exercise` improve the model fit? 
 
-We have a hint that the answer is yes because of the significant coefficients, but the two classical ways to determine this are 1) a global model comparison, seeing if the overall fit of the second model is significantly better than the first, conducted by 1a) an $F$ test or 1b) a likelihood ratio test, and 2) improvements in *adjusted* $R^2$. 
+We have a hint that the answer is yes because of the significant coefficients, but the two classical ways to determine this are 1) a global model comparison, seeing if the overall fit of the second model is significantly better than the first, most often conducted by 1a) an $F$ test or 1b) a likelihood ratio test, and 2) improvements in *adjusted* $R^2$. 
 
-### F test
+### `anova()` function for model comparison
 
-To test overall model comparisons, we can use the `anova()` function to calculate an $F$ test of overall model fit comparisons. This computes the increase in squared errors relative to the increase in degrees of freedom divided by the full model's mean squared error. The null hypothesis is that *both models fit the same*, so the ratio is expected to be 1. A significant $p$-value indicates that the model fit is significantly different. 
+To test overall model comparisons, we can use the `anova()` function to calculate either an $F$ statistic for the $F$ test or a $\chi^2$ statistic for the LRT. 
+
+Conceptually, we can think of the $F$ test as
+
+$$F = \frac{ \text{increase in error per increase in df}}{\text{minimal error per df}}$$ 
+
+The numerator contains the difference in sums of squared residuals between the simpler model and the more complex model. However, the simpler model can never have a reduction in error. It will always be the same or larger, so we divide the reduction in error due to the full model by the number of additional parameters in the full model. This is captured as the difference in degrees of freedom between the models, $\Delta df$. 
+
+The denominator is the sums of squares errors of the full model divided by its total degrees of freedom. This serves as a benchmark or baseline error per $df$.
+
+###
+
+If the models fit the same, we expect the errors per $df$ to be the same in the long run, and $F = 1$. This is the null hypothesis of the $F$ test. A large $F$ means that the errors are greatly reduced by considering a more complex model. 
+
+The $F$ test is used when the models are estimated by ordinary least squares (OLS). 
 
 ### 
 
-One methodological thing to note here: adding predictors will never result in *worse* model fit, even if the new predictor has zero true relationship with $Y$. The new variable will help reduce the unexplained part of $Y$, even if just by chance and sampling fluctuation. 
-
-So, the variation explained by the larger and smaller models has to be adjusted by their *degrees of freedom* taken up by the model - the number of things it estimates. The difference in degrees of freedom between the models is denoted $\Delta df$. 
-
 ### Likelihood ratio test
 
-The likelihood ratio test (LRT) is more flexible than the $F$ test, but it has the same goals. The $F$ test applies to models estimated with ordinary least squares, which is used for the general linear model. The likelihood ratio test is based on maximum likelihood estimation, which is more flexible and can be used for generalized linear models and mixed-effects models.
+The likelihood ratio test (LRT) is more flexible than the $F$ test, but it has the same goal. The major distinction between the two is that LRT is applied when the models are estimated using maximum likelihood estimation (MLE). MLE is more flexible than least squares and can be used for a wider range of models, such as generalized linear models and mixed-effects models. However, there is "no free lunch" in statistics - MLE requires additional, stronger assumptions than OLS.
+
+###
+
+MLE assumes a probability density function for the data, such as a normal distribution, and then calculates the total value of the density over all data points. The LRT is a ratio of the likelihoods based on estimates of the simpler model to the more complex model. You may have seen output such as "-2LL" before; this is because we usually work with the log likelihoods for mathematical convenience, and the constant "-2" is multiplied by the ratios for the test. 
+
+###
 
 Note for both approaches, the models need to be nested, meaning one model is a subset of the other. Usually, this means that one can arrive at the simpler model by setting one or more parameters of the full model to zero.
 
 ### 
 
-Below, run the `anova` function on the two models `mod, fit1` ("smaller" model first). For the LRT, add the argument `test = "LRT"`. 
+Below, run the `anova` function on the two models `mod, fit1` ("smaller" model first). The default is to apply the $F$ test. For the LRT, add the argument `test = "LRT"`. 
 
 ```{r reg6, exercise = TRUE, exercise.setup = "reg5-2"}
 anova(mod, fit1)
@@ -245,6 +271,7 @@ question_text("Notes to self on interpreting the likelihood ratio test for our t
 	incorrect = NULL,
 	rows = 3)
 ```
+
 
 ### adjusted $R^2$
 
@@ -380,7 +407,6 @@ The adjusted estimates are not far from the raw variables.
 How about for exercise:
 
 ```{r reg12, exercise = TRUE, exercise.setup = "reg5-2"}
-library(emmeans)
 emmeans(fit1, ~ exercise) 
 stress |> group_by(exercise) |> 
   summarize(mean(score))
@@ -390,9 +416,9 @@ A little more adjustment here.
 
 ###
 
-Partial residual plots can help us to identify areas of misfit, such as predictors where the association may be non-linear when the partial residuals do not align with the linear trend. 
+Partial residual plots (above) can help us to identify areas of misfit, such as predictors where the association may be non-linear when the partial residuals do not align with the linear trend. 
 
-For completeness, we can also check the residuals against the fitted values as before. We hope to see residuals centered around zero with a contant amount of variation over the range of x. 
+For completeness, we can also check the residuals against the fitted values as before. We hope to see residuals centered around zero with a constant amount of variation over the range of `x`. 
 
 What function did we learn last time for extracting model fit information, such as predicted values and residuals?
 
@@ -425,16 +451,20 @@ fit1 <- lm(score ~ treatment + exercise + age, stress)
 
 There are some critical issues to note here: 
 
-* notice that we have several different "pieces" of the interaction effect that we are after - `lm` runs a series of tests on very specific comparisons of levels of the factors using internal contrast codes for each cross-tabulation of the factor
-* that's complex, but the take-home is that the overarching question of "is the effect of treatment different at different levels of exercise" is a *joint* hypothesis, and it cannot be answered by a single effect comparison
+* notice that we have several different "pieces" of the interaction effect that we are after - `lm` runs tests on very specific comparisons of levels of the factors using internal contrast codes for each cross-tabulation of the factors
+* that's complex, but the take-home is that the overarching question of "is the effect of treatment different at different levels of exercise?" is a *joint* hypothesis, and it cannot be answered by a single effect comparison
 
 To conduct a *joint* test for interactions between categorical variables, we need to use ANOVA methods.
 
 ###
 
-The default `anova()` function is actually not appropriate for most ANOVA analyses - this is one major limitation of `R` compared to other software. Without getting too far into the weeds...there are several ways to calculate the sums of squares for a model with categorical predictors. The primary ones are called Type I, II, and III sums of squares. Type I is considered the worst option, but it is the only method available in `anova(lm())`. 
+The default `anova()` or `aov()` functions are actually not appropriate for most ANOVA analyses - this is one major limitation of `R` compared to other software. Without getting too far into the weeds...there are several ways to calculate the sums of squares for a model with categorical predictors. The primary ones are called Type I, II, and III sums of squares. Type I is considered the worst option, but it is the only method available in `anova(lm())`. 
 
-One option is to, use the `Anova()` function from `car` package. This has arguments of `type = 2` or `type = 3`, which are the correct ways to calculate sums of squares. 
+###
+
+One option is to, use the `Anova(lm())` function from `car` package. This has arguments of `type = 2` or `type = 3`, which are the correct ways to calculate sums of squares. 
+
+###
 
 Another option is to use a package designed for ANOVA/ANCOVA models. One that I like is called `afex`. It has a few different primary functions, but the `aov_ez()` function is mean to provide an easy interface for ANOVA models. It requires an ID column, even for a fully between-subjects design, but otherwise is pretty simple. The main arguments are:
 
@@ -471,7 +501,9 @@ We get the overall test for each factor (called main effects) and the joint test
 
 ###
 
-* further, regression coefficients can change depending on how the internal factor coding is assigned
+Other issues with the `lm()` using categorical interaction terms:
+
+* the regression coefficients can change depending on how the internal factor coding is assigned
 * instead, we can conduct the tests in a different way - comparing the "cell means" of stress, where a cell is the combination of treatment $\times$ exercise:
 
 | **Treatment** | **Low Exercise** | **Moderate Exercise** | **High Exercise** |
@@ -485,9 +517,289 @@ We get the overall test for each factor (called main effects) and the joint test
 
 ### 
 
-[under construction]
+If the interaction effect is significant, then we want to compare different levels of exercise within the treatment = Yes and treatment = No groups, separately. Remember, the interaction effect means that the effect of exercise is different at different levels of treatment. 
+
+First, we could test for a "simple main effect", which tests if the exercise factor has an overall effect within each level of treatment. This is done with a function called `joint_tests()` from `emmeans`. Provide the model and an argument `by = "factorB"` to test the effect of "factor A" in specific levels of `factorB`.
+
+```{r int3-1, exercise = TRUE, exercise.setup = "int2"}
+joint_tests(fit3, by = "treatment")
+```
 
 ###
+
+These are both significant, so we would conduct specific exercise comparisons within the treatment levels.
+
+For `emmeans`, we can modify the formula argument to ask for estimated marginal means of factor A **conditional on** factor B with the following: `emmeans(model, ~ A | B)`. For our data:
+
+```{r int3, exercise = TRUE, exercise.setup = "int2"}
+emm1 <- emmeans(fit3, ~ exercise | treatment)
+emm1
+
+#emmeans(fit3, "exercise", by = "treatment") #equivalent
+```
+
+### 
+
+There are many different types of follow-up comparisons we can make in these contexts, but usually, we are interested in pairwise comparisons of different factor $A$ levels within $B$ levels. With the `emm1` object, we can use the function `pairs` from `emmeans` to conduct all pairwise comparisons:
+
+```{r int4, exercise = TRUE, exercise.setup = "int3"}
+pairs(___)
+#emmeans(fit3, pairwise ~ exercise | treatment) #equivalent, but more info
+```
+
+###
+
+`emmeans` and `afex` have built-in functionality for creating interaction plots based on the resulting model. 
+
+* `afex` uses `afex_plot()`, which requires the model, the `x` variable, and the `trace` or grouping variable
+* `emmeans` uses `emmip()`, which requires the model or the result of `emmeans` and the formula 
+
+Here are two examples: 
+
+
+```{r int5, exercise = TRUE, exercise.setup = "int2"}
+#afex:
+afex_plot(fit3, x="exercise", 
+          trace = "treatment")
+
+#emmeans:
+emmip(fit3, ~ exercise | treatment,
+      CIs = TRUE)
+```
+
+Both plots are built on `ggplot`, so we can add layers to customize them. Personally, I think the `afex_plot` is nicer. 
+
+###
+
+Below, switch around the `x` and `trace` arguments in `afex_plot()`, and add `theme_classic`. 
+
+```{r int5-1, exercise = TRUE, exercise.setup = "int2"}
+
+```
+
+###
+
+See [this really helpful documentation](https://cran.r-project.org/web/packages/afex/vignettes/afex_plot_introduction.html) on customizing the `afex_plot()` output. We can do all kinds of things within `afex_plot` or by adding layers. 
+
+Here is one example: the default geometric object for the data points in the background is `geom_point`. We can change this in `afex` with the argument `data_geom`: 
+
+```{r int6, exercise = TRUE, exercise.setup = "int2"}
+#afex:
+afex_plot(fit3, x="exercise", 
+          trace = "treatment",
+          data_geom = geom_boxplot)
+```
+
+###
+
+We can make it even nicer using tools we've learned this semester: 
+
+```{r int7, exercise = TRUE, exercise.setup = "int2"}
+#afex:
+afex_plot(fit3, x="exercise", 
+          trace = "treatment",
+mapping = c("shape", "color"), #NEW
+data_geom = geom_violin
+) + 
+ theme_classic() + 
+ labs(y = "Stress Score", 
+ x = "Exercise group", 
+ shape = "SKY Intervention",
+ title = "SKY meditation enhances the stress-reduction benefits of exercise",
+ caption = "Predicted means adjusted for participant age")
+```
+
+###
+
+In the remaining sections, I present some example code and output for different types of ANOVA applications. In the interest of time, we won't dissect them all. 
+
+### One-way Between Subjects 
+
+Using the stress data, let's perform ANOVA of the `exercise` factor. 
+
+```{r int8, exercise = TRUE, exercise.setup = "int2"}
+one_way <- aov_ez(
+"id", 
+"score",
+stress,
+between = "exercise"
+)
+one_way
+emm_one<-emmeans(one_way, ~ exercise)
+emm_one
+pairs(emm_one)
+afex_plot(one_way, x = "exercise")
+```
+
+Note: `ges` is "generalized eta squared", an effect size measure similar to $R^2$ but designed for factorial designs, especially involved within- or mixed within-between factors.
+
+compare this to the simple `lm`: 
+
+```{r int9, exercise = TRUE}
+coefficients(lm(score ~ exercise, stress))
+```
+
+Interpretation: the exercise factor is significant for explaining differences in stress scores. Follow-up tests reveal that the high exercise group has a significantly lower average stress compared to both low and moderate groups. The low and moderate groups do not differ. 
+
+### One-way Within-subjects 
+
+Here, we use the `selfesteem` data from the `datarium` package. The dataset contains 10 individuals' self-esteem score on three time points during a specific diet. One row per subject with `id, t1, t2, t3` columns. 
+
+`afex` requires long format. Below I provide all the code (you will need to call for the output objects in the code, such as asking for `one_within` after it's run): 
+
+```{r int10, exercise = TRUE}
+selfesteem_long <- selfesteem |>
+  pivot_longer(cols = -id, 
+               names_to = "time", 
+               values_to = "self_esteem")
+
+one_within <- aov_ez("id", "self_esteem",
+                   selfesteem_long, 
+                   within = "time")
+emm_w <- emmeans(one_within, pairwise ~ time)
+p1<- afex_plot(one_within, 
+x = "time", 
+error = "within" #used for within-subjects designs
+)
+```
+
+Interpretation: There was a significant effect of the time factor on self esteem. Follow-up tests revealed that self esteem significantly increased at each time. Self esteem was 1.8 points higher at time 2 compared to time 1 and 2.7 points higher at time 3 compared to time 2.  
+
+### One within factor, one between factor
+
+We will use the `depression` dataset from `datarium`. This dataset follows a treatment and control group (`treatment`) over 4 time points (`t0:t3`). Once again, we'll convert to long format.
+
+This design with both between- and within-subject factors is often referred to as a mixed ANOVA or a split-plot design. Calculating the appropriate error terms for the various effects is a little complicated. However, `afex` handles this internally quite well. 
+
+One other option we may consider is conducting a "simple main effects" test if there is an overall time by treatment interaction. In this case, this would mean testing the "time" factor within the specific levels of treatment before conducting specific pairwise contrasts. We can do this with the `joint_tests()` function described previously. 
+
+Another added wrinkle here: to aid in the interpretation, I also conduct pairwise comparisons of treatment vs control at each individual time point. 
+
+
+```{r int11, exercise = TRUE}
+dep_long <- depression |>
+  pivot_longer(cols = -c(id, treatment), names_to = "time",
+               values_to = "dep_score")
+#dep_long #check data format
+mixed_anova <- aov_ez("id", "dep_score",
+                      dep_long,
+                      between = "treatment",
+                      within = "time"
+                      )
+#mixed anova # significant interaction, so observe time trends within group
+joint_tests(mixed_anova, by = "treatment")
+emm_mixed <- emmeans(mixed_anova, pairwise ~ time | treatment)
+# beyond our scope - could limit comparisons so that not all pairwise are tested
+emm_mixed
+
+emm_mixed2 <- emmeans(mixed_anova, pairwise ~ treatment  | time)
+emm_mixed2
+
+p2<-afex_plot(
+  mixed_anova, x = "time", 
+  trace = "treatment")
+p2
+```
+
+The warning message on the plot indicates that the error bar calculations for a mixed or split-plot ANOVA are not perfectly correct - so we cannot decide which comparisons are significant strictly by comparing the error bars. The default uses `error = "model"`, which adds error from both within and between factors. 
+
+Interpretation: The significant interaction between treatment and time indicates that the two groups had significantly different trends. The `joint_tests` result indicates that time has a significant time effect for each group, so we can investigate specific time trends for both groups. While both groups saw a reduction in depression scores over the course of time, the tests reveal distinct patterns for each group. The treated group saw an immediate reduction in symptoms, followed by a plateau where symptoms did not change between time 2, 3, and 4. The control group saw a slow, steady reduction from time 1, where times 3 and 4 were significantly lower than baseline. The reduction flattened out for the control group, as time 4 was not different from time 3. Further, specific comparisons of treatment within time revealed that the treatment group had significantly lower depression scores at all time points except for baseline (pre-treatment). 
+
+## Practice Exercises
+### 
+
+Your turn! Use the code and explanations throughout the module to perform the following analyses and provide informal interpretation of the results. You can also use the optional shell document if that makes coding and trouble-shooting easier. 
+
+### General Social Survey Data
+
+The object `gss_data` is already loaded in our tutorial environment. This contains a subset of individuals from the General Social Survey from the National Opinion Research Center of the University of Chicago. I've filtered to only observations from 2016.
+
+The data contain columns for 
+
+| Column       | Value       |
+| ------ |---------------| 
+| year | 2016
+| gender | a factor with levels female male |
+| nativeBorn | Was the respondent born in the US? no or yes. |
+| ageGroup | a factor with levels 18-29 30-39 40-49 50-59 60+. |
+| educGroup | a factor with levels <12yrs, 12yrs, 13-15yrs, 16yrs, >16yrs |
+| vocab | Number of words out of 10 correct on a vocabulary test |
+| age | age of the respondent in years |
+| educ | years of education. 12 = high school graduate, 16 = college graduate.|
+
+Fit and compare the following regression models: 
+
+1. vocab regressed on educ and age
+2. vocab regressed on educ, age, and gender
+3. vocab regressedon educ, age, nativeBorn, and gender
+
+Compare the models and interpret the best-fitting one. Include some post-analysis visual checking for interpretation and/or diagnostics.
+
+```{r activity1, exercise = T}
+glimpse(gss_dat)
+
+
+
+
+```
+
+
+```{r quiz6, echo = FALSE}
+question_text("What was the final model chosen and why? What is your interpretation of the model estimates and overall fit?",
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 3)
+```
+
+
+### Job Satisfaction
+
+The `jobsatisfaction` data contain job satisfaction scores organized by gender and education level. Perform a two-way between subjects ANOVA, plot your findings, and interpret the result. 
+
+```{r activity2, exercise = T}
+glimpse(jobsatisfaction)
+
+
+
+
+```
+
+
+```{r quiz7, echo = FALSE}
+question_text("What is the result of the two-way ANOVA? Which, if any, factors were significant, and how do we interpret their impact on job satisfaction?",
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 3)
+```
+
+### Anxiety data
+
+The `anxiety` data contain measured anxiety scores at three time points across three different groups of individuals in different physical exercise conditions: grp1 (resting), grp2 (moderate), grp3 (high). 
+
+Conduct a mixed ANOVA examining if exercise impacts anxiety trends over time. Plot the findings and report your result. 
+
+```{r activity3, exercise = T}
+glimpse(anxiety)
+
+
+
+
+```
+
+
+```{r quiz8, echo = FALSE}
+question_text("What is the result of the splot-plot/mixed ANOVA? Did anxiety trends differ by exercise condition, and if so, how?",
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 3)
+```
+
 
 ```{r download-answers, child = system.file("child_documents/download_answers.Rmd", package = "tutorial.helpers")}
 ```
