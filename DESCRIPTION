@@ -37,6 +37,7 @@ Imports:
     GGally,
     jtools,
     afex,
-    car
+    car,
+    emmeans
 Remotes:
     rstudio-education/gradethis
