@@ -792,7 +792,7 @@ glimpse(anxiety)
 
 
 ```{r quiz8, echo = FALSE}
-question_text("What is the result of the split-plot/mixed ANOVA? Did anxiety trends differ by exercise condition, and if so, how?",
+question_text("What is the result of the splot-plot/mixed ANOVA? Did anxiety trends differ by exercise condition, and if so, how?",
 	answer(NULL, correct = TRUE),
 	allow_retry = TRUE,
 	try_again_button = "Edit Answer",
