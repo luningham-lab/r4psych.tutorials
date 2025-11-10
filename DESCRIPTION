@@ -38,6 +38,7 @@ Imports:
     jtools,
     afex,
     car,
-    emmeans
+    emmeans,
+    mosaicData
 Remotes:
     rstudio-education/gradethis
