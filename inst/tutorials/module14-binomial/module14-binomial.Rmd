@@ -159,6 +159,7 @@ Now, re-run `fit1` with `outcome2` as the outcome. Check the `effect_plot` with 
 
 ```{r fit4, exercise = TRUE, exercise.setup = "fit3-2"}
 fit1 <- lm(outcome ~ age, Whickham)
+
 ___(fit1)
 effect_plot(fit1, pred = ___, 
             interval = ___, 
