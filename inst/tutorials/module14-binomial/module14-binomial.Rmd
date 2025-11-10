@@ -1,0 +1,274 @@
+---
+title: "Binomial regression in the generalized lienar model"
+tutorial:
+  id: "module14-binomial"
+  name: "Binomial regression in R"
+output: 
+  learnr::tutorial:
+    progressive: true
+    allow_skip: true
+runtime: shiny_prerendered
+author: Justin Luningham
+description: "Binomial regression in R."
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(MASS)
+library(car)
+library(emmeans)
+library(afex)
+library(kableExtra)
+library(jtools)
+library(infer)
+library(moderndive)
+library(learnr)
+library(report)
+library(rempsyc)
+library(broom)
+library(data.table)
+library(flextable)
+library(rstatix)
+library(ggpubr)
+library(tidyverse)
+library(tutorial.helpers)
+library(datarium)
+library(GGally)
+library(mosaicData)
+options(repos = c(CRAN = "https://cran.rstudio.com"))
+if (!requireNamespace("gradethis", quietly = TRUE)) {
+  learnr::tutorial_warning(
+    "This tutorial uses the **gradethis** package to provide feedback.  
+    It looks like you don’t have gradethis installed yet.  
+    Please run this in your console:
+    
+    remotes::install_github('rstudio-education/gradethis')"
+  )
+} else {
+  library(gradethis)
+  gradethis::gradethis_setup()  # optional: standardizes grading defaults
+}
+
+set.seed(144445)
+one_sample <- tibble(first_walk = round(rnorm(50, 12.8, 2.5),1))
+raw_pairs<-mvrnorm(25, mu = c(14, 12.8), Sigma = cbind(c(2.5, 1), c(1, 2.5)))
+
+paired_samples <- tibble(sib1 = round(raw_pairs[,1],1), sib2 = round(raw_pairs[,2],1), famID=1:25)
+
+paired_long <-paired_samples |> pivot_longer(cols = c(sib1, sib2), values_to = "first_walk", names_to = "sibling")
+
+two_sample<-tibble(control = round(rnorm(50, 14, 2.5),1), intervention = round(rnorm(50, 13, 2.5 ),1))
+
+two_sample_long <- two_sample |> 
+  pivot_longer(cols = c(control, intervention), # or, cols = everything()
+              values_to = "first_walk", names_to = "group")
+
+#dat <- read_delim("~/Downloads/Tab10-2.txt", 
+#    delim = "\t", escape_double = FALSE, 
+#    trim_ws = TRUE)
+
+attr(stress$score, "label") <- "Stress Score"
+attr(stress$age, "label") <- "Age"
+
+#contrasts(stress$treatment) <- contr.sum(2)
+#contrasts(stress$exercise) <- contr.sum(3)
+
+
+
+
+
+fit2 <- glm(outcome ~ age, Whickham, family = "binomial")
+effect_plot(fit2, pred = "age", interval = TRUE, plot.points = TRUE)
+effect_plot(fit2, pred = "age", interval = TRUE)
+summary(fit2)
+
+fit3 <- glm(outcome ~ smoker, Whickham, family = "binomial")
+summary(fit3)
+
+effect_plot(fit3, pred = "smoker")
+
+fit4 <- glm(outcome ~ smoker + age, Whickham, family = "binomial")
+summary(fit4)
+
+effect_plot(fit4, pred="age", interval=T)
+effect_plot(fit4, pred="age", interval=T, partial.residuals = T)
+
+
+
+#fit5 <- glm(outcome ~ smoker + age_cat, Whickham, family = "binomial")
+
+```
+
+
+```{r info-section, child = system.file("child_documents/info_section.Rmd", package = "tutorial.helpers")}
+```
+
+
+## Categorical outcomes
+###
+
+All of the models we've learned so far assume that the outcome is a continuous, quantitative variable with errors that have a mean of 0 and a constant variance. In many cases, we also assume that these errors are normally distributed, which means that $Y$ conditioned on $X$ is also normally distributed. 
+
+Of course, many outcomes that we study are not exactly continuous and are certainly not normally distributed. We mentioned that many of these approaches (e.g. t-test, ANOVA, even linear regression) are **robust** to some violations of assumptions. They are still accurate even if data are not perfectly normal or variances are not equal across groups. 
+
+Will this hold if the outcome is not truly continuous? 
+
+###
+
+As usual, the answer is "it depends!" How different from continuous is our outcome? 
+
+If the outcome is a Likert-type variable on 1-7 scale with $\sim$ 500 responses, it might be approximately normal. But what if the outcome is a specific **event**, such as answering a question correctly or receiving a diagnosis?
+
+###
+
+Let's revisit the `Whickham` dataset examining smoking status and mortality among Women in Whickham, UK. The dataset is a subset of women who were current smokers or never smokers between 1972-1974, and their survival status was ascertained after 20 years. The variables are `outcome`, `smoker`, and `age` at the time of first survey. 
+
+```{r fit1, exercise = TRUE}
+library(mosaicData)
+glimpse(Whickham)
+```
+
+###
+
+Fit a simple linear model predicting `outcome` from `age` below. Call it `fit1`. 
+
+```{r fit2, exercise = TRUE}
+fit1 <- ___(___, Whickham)
+```
+
+###
+
+The warning message occurs because `lm` struggles internally when the outcome is a factor, not a number. Let's quickly create a new column called `outcome2`, which converts `outcome` to a numeric value. 
+
+```{r fit3, exercise = TRUE}
+Whickham <- Whickham |>
+  ___(outcome2 = (as.numeric(___) - 1))
+Whickham |> count(outcome, outcome2) #check
+```
+
+
+```{r fit3-2, include = FALSE}
+Whickham <- Whickham |> mutate(outcome2 = as.numeric(outcome)-1)
+```
+
+I include the `-1` part here to scale `outcome2` as 0 or 1. 
+
+###
+
+Now, re-run `fit1` with `outcome2` as the outcome. Check the `effect_plot` with `age` as the predictor. Be sure to plot the raw data points.  
+
+```{r fit4, exercise = TRUE, exercise.setup = "fit3-2"}
+fit1 <- lm(outcome ~ age, Whickham)
+summary(fit1)
+effect_plot(fit1, pred = "age", interval = TRUE, plot.points = TRUE)
+```
+
+```{r fit4-2, include = F}
+Whickham <- Whickham |> mutate(outcome2 = as.numeric(outcome)-1)
+fit1 <- lm(outcome2 ~ age, Whickham)
+```
+
+###
+
+Let's examine the residuals against the fitted values. `augment()` the fit and pipe it to a simple `ggplot` for residuals on the `y` axis and fitted values on the `x` axis. 
+
+```{r fit5, exercise = TRUE, exercise.setup = "fit4-2"}
+augment(fit1) |> 
+  ggplot(aes(x = .fitted, y = .resid))+
+  geom_point()
+```
+
+###
+
+Yikes!
+
+### The generalized linear model 
+
+Clearly, there are instances where a linear predictor of a continuous $Y$ simply does not make sense. Statistically, it's a mess, and practically, it's impossible to interpret. An "event" outcome is a clear example. 
+With a binary outcome, the observed data are simply zeros and ones, and they follow a specific distribution called a Bernoulli distribution. This is a special case of the binomial distribution with only one "trial". The parameter of the Bernoulli distribution is $p$, of the probability that the outcome equals 1 (probability of "success"). 
+
+###
+
+For example, a single coin flip follows a Bernoulli distribution with $p = 0.5$. If 1 = Heads, then $P(Y = Heads)$ = 0.5 and $P(Y = Tails) = 1 -P(Y = Heads) = 0.5$. 
+
+In our regression model, we don't want to model the 0's and 1's directly; instead, we explicity model $P(Y = 1)$, or $p$. 
+
+###
+
+
+The **generalized** linear model extends the general linear model by applying some "link function" to the outcome, such that it is transformed in a way that corresponds to the unique distribution of the data. 
+
+$$ g(Y) = \beta_0 + \beta_1 X_{1} + \beta_2 X_{2} +... +\beta_k X_k$$ 
+The key take-aways are that
+
+1. The outcome is still "linear in the predictors" - effects are additive
+2. However, we have to interpret the regression coefficients as a function of the *inverse* of the link function
+3. The errors/residuals are not included because they look different depending on the form of the link 
+
+###
+
+For binary outcomes, the probability that $Y = 1$, or $p$, is linked to the outcomes through the log-odds link:
+
+$$ \log (\frac{p}{1-p}) = \beta_0 + \beta_1 X_{1} + \beta_2 X_{2} +... +\beta_k X_k$$
+This outcome is also called the "log odds".
+
+###
+
+This all happens internally with our statistical software; however, the estimates are usually on the un-transformed scale. The inverse of the log odds is to take the exponential of everything on the right-hand side. 
+
+###
+
+Enough of that, let's see what this means in practice. The base `R` function for the generalized linear model is conveniently called `glm()`. It actually operates a lot like the `lm`, but it requires an additional argument called `family`. The `family` refers to the type of distribution of the outcome. For 0/1 data, we add `family = "binomial". 
+
+The following fits the model and gets the summary, in the same way as `lm` - with slightly different information.
+
+```{r fit6, exercise = TRUE, exercise.setup = "fit4-2"}
+fit2 <- glm(outcome ~ age, Whickham, 
+            family = "binomial")
+summary(fit2)
+```
+
+###
+
+In `fit1`, the age effect was 0.017, or for every year increase, the predicted increase on 0-1 mortality was 0.017. Now the age estimate is 0.12. What does this mean? 
+
+Recall that this estimate is on the untransformed scale. One year increase in age corresponds to 0.12 increase in the log-odds of death. For these coefficients, a positive value indicates an increase in the predictor leads to an increase likelihood of the outcome, whereas a negative coefficient suggests a decrease in the likelihood.
+
+If we take the inverse of the log, we get something much more interpretable: the odds ratio. This is the multiplicative change in the odds of the outcome per one-unit change in the predictor. No effect is indicated by odds ratio of 1.0. Greater than 1 indicates an increase in odds, less than one indicates a decrease in the odds.
+
+###
+
+The inverse is found by "exponentiating" the regression coefficients. We can do this in `R` with `exp()`. 
+
+More conveniently, we can `tidy` our output and ask for the transformation internally. 
+
+```{r fit7, exercise = TRUE, exercise.setup = "fit6"}
+tidy(fit2, exponentiate =  TRUE, conf.int = TRUE)
+```
+
+This means that every one-year increase in age leads to a 13% increase in the odds of death. 
+
+```{r fit8, exercise = TRUE, exercise.setup = "fit6"}
+effect_plot(fit2, pred = "age", interval = TRUE)
+```
+
+###
+
+[under construction]
+
+- add smoker status
+- deviance and LRT 
+- predictions
+
+```{r cat_age, include = F}
+Whickham<- Whickham |>
+  mutate(age_cat = case_when(
+    age <= 44 ~ "18-44",
+    age > 44 & age <= 64 ~ "45-64",
+    age > 64 ~ "65+"))
+```
+
+###
+
+```{r download-answers, child = system.file("child_documents/download_answers.Rmd", package = "tutorial.helpers")}
+```
