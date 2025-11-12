@@ -455,8 +455,77 @@ This use case is another example of why logistic regression is valuable and why 
 
 Linear regression does predict values between 0 and 1, but 1) it is not forced to center at 0.5, and 2) it can go beyond 0 or 1. 
 
-[Courtesy of Christoph Molnar, *Interpretable Machine Learning*:](https://christophm.github.io/interpretable-ml-book/logistic_files/figure-html/fig-linear-class-threshold-1.png)
+![Courtesy of Christoph Molnar, *Interpretable Machine Learning*:](https://christophm.github.io/interpretable-ml-book/logistic_files/figure-html/fig-linear-class-threshold-1.png)
 
+### 
+
+By applying the logistic function to the linear predictor, it is forced to fall between 0 and 1, and 0.5 is 50/50 probability:
+
+![Courtesy of Christoph Molnar, *Interpretable Machine Learning*:](https://christophm.github.io/interpretable-ml-book/logistic_files/figure-html/fig-logistic-class-threshold-1.png)
+
+###
+
+We don't get $\hat{y}$ out of `glm` directly, but we can obtain it in a few steps. Revisting our `fit4` object, we can use the `predict()` function. 
+
+```{r classify1, exercise = TRUE}
+predict(fit4) |> head(10)
+```
+
+###
+
+Hm. These don't look like probabilities!
+
+The default output is on the scale of the linear predictions of the $X$ variables, which is the predicted log-odds. Thankfully, getting the probabilities is easy if we ask for the predictions on the "response" scale with `type = "response"`.
+
+```{r classify1, exercise = TRUE}
+predict(fit4, type = "response") |> head(10)
+```
+
+###
+
+This returns $\hat{p}$. We need to apply a classification decision rule to obtain $\hat{y}$. This comes down to a little bit of programming that we've seen before: `ifelse` or `if_else` functions. 
+
+```{r classify2, exercise = TRUE}
+phat<-predict(fit4, type = "response")
+
+ifelse(phat > .5, "Dead","Alive") |> head(10)
+```
+
+### 
+
+A helpful function that we haven't seen before is called `table()`. It is similar to the `count()` function of `dplyr`, but it works with matrices and not only `data.frames`. 
+
+```{r classify3, exercise = TRUE, exercise.setup = "classify2"}
+ifelse(phat > .5, "Dead","Alive") |> table()
+```
+
+Compare this to the original data by `count`ing the `outcome`:
+
+```{r classify4, exercise = TRUE, exercise.setup = "classify2"}
+Whickham |> ___(outcome)
+```
+
+### 
+
+We cans see the predicted and original classifications don't perfectly align. A common way to summarize this is through a *confusion matrix*: a $2 \times 2$ table that includes predicted 0 and 1 as one factor and true 0 and 1 as the other factor. 
+
+`table()` is one tool to create this. Below, look at each line and interpret the steps I take: 
+
+```{r classify5, exercise = TRUE, exercise.setup="classify2"}
+Whickham <- Whickham |>
+  mutate(phat = predict(fit4, type = "response"),
+         yhat = ifelse(phat > .5, "Dead", "Alive"))
+
+table(Truth = Whickham$outcome, Predicted = Whickham$yhat)
+```
+
+### 
+
+Next time: 
+
+- interpreting the confusion matrix 
+- visualizing false positive and true positive 
+- summarizing prediction accuracy 
 
 
 ```{r download-answers, child = system.file("child_documents/download_answers.Rmd", package = "tutorial.helpers")}
