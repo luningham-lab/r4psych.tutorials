@@ -477,7 +477,7 @@ Hm. These don't look like probabilities!
 
 The default output is on the scale of the linear predictions of the $X$ variables, which is the predicted log-odds. Thankfully, getting the probabilities is easy if we ask for the predictions on the "response" scale with `type = "response"`.
 
-```{r classify1, exercise = TRUE}
+```{r classify1-1, exercise = TRUE}
 predict(fit4, type = "response") |> head(10)
 ```
 
