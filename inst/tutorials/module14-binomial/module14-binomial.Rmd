@@ -80,18 +80,13 @@ attr(stress$age, "label") <- "Age"
 fit2 <- glm(outcome ~ age, Whickham, family = "binomial")
 effect_plot(fit2, pred = "age", interval = TRUE, plot.points = TRUE)
 effect_plot(fit2, pred = "age", interval = TRUE)
-summary(fit2)
+
 
 fit3 <- glm(outcome ~ smoker, Whickham, family = "binomial")
 summary(fit3)
 
-effect_plot(fit3, pred = "smoker")
 
 fit4 <- glm(outcome ~ smoker + age, Whickham, family = "binomial")
-summary(fit4)
-
-effect_plot(fit4, pred="age", interval=T)
-effect_plot(fit4, pred="age", interval=T, partial.residuals = T)
 
 
 
@@ -213,7 +208,7 @@ The key take-aways are that
 For binary outcomes, the probability that $Y = 1$, or $p$, is linked to the outcomes through the log-odds link:
 
 $$ \log (\frac{p}{1-p}) = \beta_0 + \beta_1 X_{1} + \beta_2 X_{2} +... +\beta_k X_k$$
-This outcome is also called the "log odds".
+We also refer to this outcome as the "log odds" of $Y = 1$.
 
 ###
 
@@ -221,7 +216,11 @@ This all happens internally with our statistical software; however, the estimate
 
 ###
 
-Enough of that, let's see what this means in practice. The base `R` function for the generalized linear model is conveniently called `glm()`. It actually operates a lot like the `lm`, but it requires an additional argument called `family`. The `family` refers to the type of distribution of the outcome. For 0/1 data, we add `family = "binomial". 
+Note: the the log-odds "link" is technically called the *logit* link, so you may hear that terminology. The logit link is the inverse of the logistic function, which is applied to the linear predictor to keep predicted values between 0 and 1 (probabilities). For this reason, this approach is often referred to as *logistic regresion*. 
+
+###
+
+Enough of that, let's see what this means in practice. The base `R` function for the generalized linear model is conveniently called `glm()`. It operates a lot like the `lm`, but it requires an additional argument called `family`. The `family` refers to the type of distribution of the outcome. For 0/1 data, we add `family = "binomial"`. 
 
 The following fits the model and gets the summary, in the same way as `lm` - with slightly different information.
 
@@ -231,47 +230,234 @@ fit2 <- glm(outcome ~ age, Whickham,
 summary(fit2)
 ```
 
-###
+### Interpretation - effect estimate
 
-In `fit1`, the age effect was 0.017, or for every year increase, the predicted increase on 0-1 mortality was 0.017. Now the age estimate is 0.12. What does this mean? 
+In `fit1`, the age coefficient was 0.017, or for every year increase, the predicted increase on outcome was 0.017. Now the age estimate is 0.12. What does this mean? 
 
 Recall that this estimate is on the untransformed scale. One year increase in age corresponds to 0.12 increase in the log-odds of death. For these coefficients, a positive value indicates an increase in the predictor leads to an increase likelihood of the outcome, whereas a negative coefficient suggests a decrease in the likelihood.
 
-If we take the inverse of the log, we get something much more interpretable: the odds ratio. This is the multiplicative change in the odds of the outcome per one-unit change in the predictor. No effect is indicated by odds ratio of 1.0. Greater than 1 indicates an increase in odds, less than one indicates a decrease in the odds.
+If we take the inverse of the log, we get something much more interpretable: the odds ratio. This is the multiplicative change in the odds of the outcome per one-unit change in the predictor. No effect is indicated by odds ratio of 1.0. Greater than 1 indicates an increase in odds, less than one indicates a decrease in the odds. The inverse is found by "exponentiating" the regression coefficients. 
 
 ###
 
-The inverse is found by "exponentiating" the regression coefficients. We can do this in `R` with `exp()`. 
+Here is a little math behind it. From the equation above: 
 
-More conveniently, we can `tidy` our output and ask for the transformation internally. 
+$$ \log (\frac{p}{1-p}) = \beta_0 + \beta_1 X_{1} + \beta_2 X_{2} +... +\beta_k X_k$$
+where $p = Prob(Y = 1)$ and $1 - p = Prob(Y = 0)$. Exponentiate both sides:
+
+$$  \frac{p}{1-p} = \exp(\beta_0 + \beta_1 X_{1} + \beta_2 X_{2} +... +\beta_k X_k)$$
+The left-hand term is also called the "odds", the probability of the event happening divided by probability of event not happening.
+
+###
+
+Let's compare what happens when we increase $X_1$ by 1 unit, but instead of taking he difference, we'll look at the ratio of the two predictions: 
+
+$$ \frac{\text{odds}_{x_1 + 1}}{\text{odds}_{x_1}} = \frac{\exp(\beta_0 + \beta_1 (X_{1} + 1) + ... +\beta_k X_k)}{\exp(\beta_0 + \beta_1 X_{1} + ... +\beta_k X_k)}$$
+
+### 
+
+
+This mathematical rule applies here: $$\frac{ \exp(a)}{\exp(b)} = \exp(a - b)$$ 
+
+so we have the numerator minus the denominator from the ratio of the odds for $x_1 + 1$ and $x$. Many terms cancel out, and we are left with:
+
+$$ \frac{\text{odds}_{x_1 + 1}}{\text{odds}_{x_1}} =\exp(\beta_1 (X_{1} + 1) - \beta_1 X_{1} ) = \exp(\beta_1)$$
+In the end, $\exp(\beta_j)$ equals the ratio of the odds ("odds ratio"!) of $X_j$ increasing by one unit. 
+
+###
+
+In `R`, we can use the function `exp()` on the original coefficients to obtain the odds ratio. 
+
+More conveniently, we can `tidy()` our output and ask for the transformation internally with `exponentiate = TRUE`. 
 
 ```{r fit7, exercise = TRUE, exercise.setup = "fit6"}
 tidy(fit2, exponentiate =  TRUE, conf.int = TRUE)
 ```
 
-This means that every one-year increase in age leads to a 13% increase in the odds of death. 
+This means that every one-year increase in age leads to a 13% increase in the odds of death. We could also say that the odds of death increase by a factor of 1.13 per one-year increase in age. 
+
+###
+
+Note that a 2-unit increase is not $2\times 1.13 = 2.26$ change in the odds. The odds increase would increase by a factor of $ 1.13^2 = 1.13 \times 1.13 = 1.28$. 
+
+### Interpretation - inference
+
+Let's look again at the original `summary` for fit2:
+
+```{r fit7-2, exercise = TRUE, exercise.setup = "fit6"}
+summary(fit2)
+```
+
+As before, the $p$-value is based on the null hypothesis $H_0: \beta = 0$.
+
+The $p$-value is extremely small. This is the probability of obtaining an observed test statistic at least as large as we have here, given that the null hypothesis is true. 
+
+The test statistic is calculated in the usual way: $$\frac{\text{estimate}}{\text{std. error of estimate}}$$
+
+which is $z = \frac{.12}{.007} = 17.6$ here. 
+
+### 
+
+The `effect_plot` function works with logistic regression seamlessly. Below is our usual `effect_plot` code with `fit2`:
 
 ```{r fit8, exercise = TRUE, exercise.setup = "fit6"}
-effect_plot(fit2, pred = "age", interval = TRUE)
+effect_plot(fit2, 
+            ___ = "age", 
+            interval = ___)
+```
+
+
+###
+
+The intercept is the odds of the event happening when all $X$ variables equal 0. The intercept is usually not meaningful unless the $X$ values have been intentionally scaled (e.g., all centered at their means). Here, the intercept is the odds of death at 20-year followup for newborns (age = 0). The odds ratio of the intercept is 1.0006, meaning there is no difference in the odds of death. However, we didn't actually measure any newborns in the data, so it's hard to draw conclusions about this. 
+
+The intercept is usually not of interest in logistic regression.
+
+### Categorical Predictors
+
+Now let's fit a model with smoking status as the only predictor. Call the result `fit3`. 
+
+```{r fit9, exercise = TRUE, exercise.setup = "fit6"}
+fit3 <- ___(outcome ~ smoker, 
+            Whickham, 
+            family = ___)
+summary(fit3)
+tidy(fit3, ___)
+```
+
+```{r fit9-2, include = F}
+fit3 <- glm(outcome ~ smoker, 
+            Whickham, 
+            family = binomial)
 ```
 
 ###
 
-[under construction]
+```{r quiz1, echo = FALSE}
+question_text("The **OR** for `smoker == Yes` is 0.685. How do we interpret this again?",
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 3)
+```
 
-- add smoker status
-- deviance and LRT 
-- predictions
+### Interpretation - categorical predictors
 
-```{r cat_age, include = F}
-Whickham<- Whickham |>
-  mutate(age_cat = case_when(
-    age <= 44 ~ "18-44",
-    age > 44 & age <= 64 ~ "45-64",
-    age > 64 ~ "65+"))
+Here we have a categorical predictor. The OR is the odds of death for the specific category of $X$ relative to the reference category. The reference category is non-smoker. So, being a smoker compared to non-smoker means the odds of death are reduced by a factor of 0.685. 
+
+This can also be interpreted as a percent reduction: (1 - 0.685)*100 = 31.5% reduction in the odds of death for smokers compared to non-smokers. 
+
+###
+
+We can see model-predicted probabilities of "event" with the `effect_plot`: 
+
+```{r fit10, exercise = TRUE, exercise.setup = "fit9-2"}
+effect_plot(fit3, pred = ___)
+```
+
+Because this is a simple model without other predictors, the model-implied probabilities align with descriptive probabilities: 
+
+```{r fit11, exercise = TRUE}
+Whickham |> count(outcome, smoker) |>
+  group_by(smoker) |> 
+  mutate(prop = n/sum(n))
+```
+
+### Multiple Logistic Regression
+
+Let's now consider multiple predictors in the model, as we normally would in practice. 
+
+Add both `smoker` and `age` to the model below, and call it `fit4`. 
+
+```{r fit12, exercise = TRUE}
+fit4 <- ___(___, ___, family = ___)
+summary(fit4)
+tidy(fit4, ___=TRUE)
+```
+
+```{r quiz2, echo = FALSE}
+question_text("Interpret the effect of age and smoking status in this model.",
+	answer(NULL, correct = TRUE),
+	allow_retry = TRUE,
+	try_again_button = "Edit Answer",
+	incorrect = NULL,
+	rows = 3)
 ```
 
 ###
+
+Controlling for smoking status, the age effect is largely unchanged - the OR = 1.13 and the test statistic is roughly the same. 
+
+Controlling for age, being a smoker is now associated with a 23% *increase* in the odds of death. Substantively, this makes a lot more sense. However, coefficient for `smoker == Yes` is no longer significant, so we can't say for certain that there is any difference in the probability of death based on smoking status. 
+
+### 
+
+Similar to linear regression, we also want to assess the adequacy of model fit and whether adding variables leads to better model fit. 
+
+Logistic regression (and GLM generally) cannot rely on least squares estimates and the $F$ test. Think about why: 
+
+the residual is $y - \hat{y}$. In logistic regression, $y$ is either 0 or 1, and we actually don't estimate $\hat{y}$ directly - we estimate $\hat{p}$, the probability that $Y = 1$. 
+
+### 
+
+Instead, logistic regression is based on **maximum likelihood estimates**, and model fit is assessed by something called the *Deviance*. Deviance is the difference in the (log) likelihood between the regression model of interest and something called a *saturated* model, or a model with as many parameters as observations. This model fits the sample data perfectly. 
+
+Deviance is then a measure of deviation from a perfect model. By itself, it is not incredibly meaningful. However, the difference in deviance between two nested models follows a $\chi^2$ distribution, so we can use this to obtain a **likelihood ratio test** (LRT)!
+
+###
+
+Here is an example of the LRT. Let's see if adding `age` to the simple model with `smoker` improves model fit. 
+
+```{r fit13, exercise = TRUE}
+anova(fit3, fit4)
+```
+
+### 
+
+The message indicates that it is performing an analysis of "deviance" rather than variance. If we add `test = "LRT"`, the result is the exact same.
+
+The significant result tells us that the additional parameters of the larger model significantly improve model fit.
+
+###
+
+For future reference, we can clean up the output with `tidy` and `nice_table`:
+
+```{r fit14, exercise = TRUE}
+anova(fit3, fit4) |>
+  tidy() |>
+  nice_table()
+```
+
+## Classification Problems
+###
+
+Logistic regression is widely used for purposes other than inference. In particular, we may be interested in classification, or predicting which group/categorical outcome a person is expected to fall in, given a set of predictor variables. 
+
+Again, we are not predicting 0's or 1's directly in the logistic regression model: we are modeling $p = P(Y = 1)$. How might we convert $\hat{p}$ to $\hat{y}$? 
+
+###
+
+We can impose a decision rule, such that if someone's probability is above a certain threhold, they are assigned $\hat{y} = 1$, otherwise $\hat{y} = 0$. This is referred to as "hard assignment" from a probabilistic model. 
+
+Except in very special circumstances, the decision rule for binary classification is 
+$$
+\hat{y_i} = 
+\begin{cases}
+1 & \text{ if  } \hat{p} > 0.5, \\\\
+0 & \text{ otherwise} 
+\end{cases}
+$$
+
+###
+
+This use case is another example of why logistic regression is valuable and why linear regression fails in these problems. 
+
+Linear regression does predict values between 0 and 1, but 1) it is not forced to center at 0.5, and 2) it can go beyond 0 or 1. 
+
+[Courtesy of Christoph Molnar, *Interpretable Machine Learning*:](https://christophm.github.io/interpretable-ml-book/logistic_files/figure-html/fig-linear-class-threshold-1.png)
+
+
 
 ```{r download-answers, child = system.file("child_documents/download_answers.Rmd", package = "tutorial.helpers")}
 ```
