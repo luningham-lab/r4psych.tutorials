@@ -1,5 +1,5 @@
 ---
-title: "Binomial regression in the generalized lienar model"
+title: "Binomial regression in the generalized linear model"
 tutorial:
   id: "module14-binomial"
   name: "Binomial regression in R"
