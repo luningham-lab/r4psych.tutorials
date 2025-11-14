@@ -702,7 +702,14 @@ confusionMatrix(test$outcome, test$yhat2)
 
 ### 
 
-This is a very quick and high-level overview of classification vs. statistical inference in logistic regression. There are many other issues to consider, but 
+This is a very quick and high-level overview of classification vs. statistical inference in logistic regression. There are many other issues to consider, but keep in mind a few things:
+
+1. if classification is the goal, it only matters if we predict in **new** data
+2. if classification is the goal, we don't draw conclusions about individual effect estimates
+    + however, we still balance model complexity vs simplicity, and we sometimes examine the top few most influential predictors
+3. the training and test data remain consistent when we compare multiple models
+
+Classification problems are less rigid and have less theory behind them than inferential problems. There are many choices left to us as the analyst (e.g., splitting percentages, prediction model form, model complexity), and decisions should be justified or explained at each step of the process. 
 
 ```{r download-answers, child = system.file("child_documents/download_answers.Rmd", package = "tutorial.helpers")}
 ```
