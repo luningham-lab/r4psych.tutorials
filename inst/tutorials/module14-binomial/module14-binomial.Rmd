@@ -35,6 +35,8 @@ library(tutorial.helpers)
 library(datarium)
 library(GGally)
 library(mosaicData)
+library(caret)
+library(pROC)
 options(repos = c(CRAN = "https://cran.rstudio.com"))
 if (!requireNamespace("gradethis", quietly = TRUE)) {
   learnr::tutorial_warning(
@@ -455,13 +457,13 @@ This use case is another example of why logistic regression is valuable and why 
 
 Linear regression does predict values between 0 and 1, but 1) it is not forced to center at 0.5, and 2) it can go beyond 0 or 1. 
 
-![Courtesy of Christoph Molnar, *Interpretable Machine Learning*:](https://christophm.github.io/interpretable-ml-book/logistic_files/figure-html/fig-linear-class-threshold-1.png)
+![Courtesy of Christoph Molnar, *Interpretable Machine Learning*:](https://christophm.github.io/interpretable-ml-book/logistic_files/figure-html/fig-linear-class-threshold-1.png){width=90%}
 
 ### 
 
 By applying the logistic function to the linear predictor, it is forced to fall between 0 and 1, and 0.5 is 50/50 probability:
 
-![Courtesy of Christoph Molnar, *Interpretable Machine Learning*:](https://christophm.github.io/interpretable-ml-book/logistic_files/figure-html/fig-logistic-class-threshold-1.png)
+![Courtesy of Christoph Molnar, *Interpretable Machine Learning*:](https://christophm.github.io/interpretable-ml-book/logistic_files/figure-html/fig-logistic-class-threshold-1.png){width=90%}
 
 ###
 
@@ -521,12 +523,186 @@ table(Truth = Whickham$outcome, Predicted = Whickham$yhat)
 
 ### 
 
-Next time: 
+The confusion matrix itself provides correct predictions on the diagonal and errors on the off-diagonal. There are a lot of different ways to define the quality of the predictions based on these values. Consider the general confusion matrix table: 
 
-- interpreting the confusion matrix 
-- visualizing false positive and true positive 
-- summarizing prediction accuracy 
+|   | **Actual Positive** | **Actual Negative** |
+|-----------|-------------|------------------|
+| **Predicted Positive**      | True Positive       | False Positive         | 
+| **Predicted Negative**      | False Negative      | True Negative     | 
 
+
+### 
+
+The three most commonly used metrics of classification performance are **accuracy**, **sensitivity**, and **specificity**. However, there are several other important metrics.
+
+###
+
+$$ \text{Accuracy} = \frac{\text{True Pos} + \text{True Neg}}{\text{Total Predictions}}$$ 
+
+This is simply proportion of correct predictions. In our data: $$\frac{(851+251)}{(851 + 94 + 118 + 251)} = 0.8387$$
+
+###
+
+$$ \text{Sensitivity} = \frac{\text{True Pos}}{\text{True Pos + False Neg}}$$ 
+
+Note that the denominator is the total number of Actual Positives. This is also called the true positive rate. 
+
+### 
+
+$$ \text{Specificity} = \frac{\text{True Neg}}{\text{True Neg + False Pos}}$$
+
+
+The denominator is the total number of Actual Negatives. 
+
+###
+
+$1 - specificity$ gives the number of false positives divided by actual negatives, which is the **false positive rate**.
+
+$$ \text{False Positive Rate} = \frac{\text{False Pos}}{\text{True Neg + False Pos}}$$
+
+### 
+
+The Positive Predictive Value, also called precision, is 
+
+$$PPV = \frac{\text{True Pos}}{\text{True Pos + False Pos}}$$
+In other words, how many times is a "positive" prediction correct? This metric is really important in medical prognostic models. 
+
+### 
+
+Thankfully, we can extract all of this information and more with a convenience function from the `caret` package. `caret` is a general-purpose package for performing hundreds of different types of prediction and classification analyses (i.e., machine learning), with many tools for comparing performance across models. We will only use this package for the `confusionMatrix` function. 
+
+### 
+
+The required arguments for `confusionMatrix` are `data`: the predicted outcomes and `reference`: the true outcomes; we can also provide the value for the "positive" direction with `positive = ` if we want. Let's try it:
+
+```{r classify6, exercise = TRUE, exercise.setup = "classify5"}
+library(caret)
+confusionMatrix(Whickham$___, Whickham$___,
+                positive = "Dead")
+```
+
+### 
+
+Why are we getting this error? And how can we fix it? 
+
+###
+
+Below, update the Whickham data to correct the issue, then recall the confusion matrix:
+
+```{r classify7, exercise = TRUE, exercise.setup = "classify5"}
+Whickham ___
+confusionMatrix(Whickham$___, Whickham$___,
+                positive = "Dead")
+```
+
+###
+
+`?confusionMatrix` explains all of the calculations in detail, but a few things to point out for reference: 
+
+The first p-value is a test that the accuracy of the prediction model is significantly larger than the largest class proportion in the data. 
+
+McNemar's test is of the null hypothesis that the rate of false positive and false negatives are the same. A significant value means the prediction model is more prone to one error type over the other. 
+
+Balanced accuracy is the average of sensitivity and specificity.
+
+### 
+
+One way to summarize the performance of a model is by visualizing the balance between sensitivity and specificity (or, the True Positive rate against the False Positive rate). This is known as a receiver operating characteristic (ROC) curve. 
+
+###
+
+The package `pROC` can compute an ROC object and then plot it using `ggplot`. We first create an ROC object with the function `roc()`. We need to provide the true outcome and the $\hat{p}$, the `phat` rather than `yhat`.
+
+Then, we can plot the result with `ggroc()`. 
+
+```{r classify8, exercise = TRUE, exercise.setup = "classify5"}
+library(pROC)
+roc_res <- roc(Whickham$outcome, Whickham$phat)
+ggroc(roc_res)
+```
+
+###
+
+The ROC tells us the rate of false positive to false negative over a range of different decision thresholds, so the ROC plot is not based on a classification of `phat > 0.5`. What does it mean, exactly? 
+
+![](images/roc.png){width=90%}
+
+###
+
+The area under the ROC curve (AUC) is a single measure that summarizes how well the model performs. 
+
+```{r classify9, exercise = TRUE, exercise.setup = "classify8"}
+roc_res
+```
+
+Rules of thumb: 0.5 is random guessing, 0.7-0.8 is considered acceptable, 0.8-0.9 is good and > 0.9 is very good.
+
+### Predicting in new data
+
+For classification problems, we don't usually care about accuracy of classification in our sample data. This is because if we make the model more and more complex, it will always perform a little better at predicting the given sample. 
+
+However, if the model has adapted too closely to the sample data, it will have poor performance when used to predict new cases. 
+
+###
+
+One way around this is to randomly split the data into *training* and *test* data. The training data is used to estimate the coefficients of the prediction model, but the true performance of classification accuracy is determined in the held-out test data. 
+
+Using random sampling to split the data treats our test set as if it were a new sample randomly taken from the original population. 
+
+### 
+
+Below, I use `dplyr` code to split the data into a `train` dataset and `test` dataset. I will use a 70%/30% split, although this choice is fairly subjective. 
+
+```{r classify10, exercise = TRUE}
+set.seed(35351)
+Whickham <- Whickham |> mutate(id = row_number())
+train <- Whickham |> sample_frac(0.7)
+test <- Whickham |> anti_join(train, by = "id")
+```
+
+### 
+
+We follow similar steps as before, except that the model `fit` uses `train` instead of the full data. We also need a new argument, `newdata`, within the `predict()` function. 
+
+Below, take the following steps:
+
+1. fit the `glm` model in the training data with `age` and `smoker` as predictors
+2. obtain `phat` from `predict()`, adding the argument `newdata = test`
+3. modify the test data to include `phat` and `yhat` columns, where `yhat` is the assigned predicted outcome
+4. obtain the confusion matrix of the test data predictions
+
+```{r classify11, exercise = TRUE, exercise.setup="classify10"}
+fit <- ___
+```
+
+### 
+
+```{r classify11-1, exercise = TRUE, exercise.setup="classify10"}
+fit <- glm(outcome ~ age + smoker, train, family = "binomial")
+phat <- predict(fit, newdata = test, type ="response")
+test<- test |>
+  mutate(phat = phat, 
+         yhat = factor(ifelse(phat > 0.5, "Dead", "Alive")))
+confusionMatrix(test$outcome, test$yhat)
+```
+
+###
+
+In practice, we often compare several competing models based on their accuracy. Let's see the predictive performance of considering a smoking by age interaction: 
+
+```{r classify12, exercise = TRUE, exercise.setup="classify10"}
+fit2 <- glm(outcome ~ smoker*age, train, family = "binomial")
+phat2 <- predict(fit2, newdata = test, type ="response")
+test<- test |>
+  mutate(phat2 = phat2, 
+         yhat2 = factor(ifelse(phat2 > 0.5, "Dead", "Alive")))
+confusionMatrix(test$outcome, test$yhat2)
+```
+
+
+### 
+
+This is a very quick and high-level overview of classification vs. statistical inference in logistic regression. There are many other issues to consider, but 
 
 ```{r download-answers, child = system.file("child_documents/download_answers.Rmd", package = "tutorial.helpers")}
 ```
