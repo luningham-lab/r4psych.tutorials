@@ -39,6 +39,8 @@ Imports:
     afex,
     car,
     emmeans,
-    mosaicData
+    mosaicData,
+    caret,
+    pROC
 Remotes:
     rstudio-education/gradethis
