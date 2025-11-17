@@ -41,6 +41,7 @@ Imports:
     emmeans,
     mosaicData,
     caret,
+    pscl,
     pROC
 Remotes:
     rstudio-education/gradethis
