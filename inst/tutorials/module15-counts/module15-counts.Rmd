@@ -1,0 +1,288 @@
+---
+title: "Regression for count outcomes in the generalized linear model"
+tutorial:
+  id: "module15-counts"
+  name: "Count regression in R"
+output: 
+  learnr::tutorial:
+    progressive: true
+    allow_skip: true
+runtime: shiny_prerendered
+author: Justin Luningham
+description: "Count regression in R."
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(MASS)
+library(ggpubr)
+library(ggthemes)
+library(car)
+library(emmeans)
+library(afex)
+library(kableExtra)
+library(jtools)
+library(infer)
+library(moderndive)
+library(learnr)
+library(report)
+library(rempsyc)
+library(broom)
+library(data.table)
+library(flextable)
+library(rstatix)
+library(ggpubr)
+library(tidyverse)
+library(tutorial.helpers)
+library(datarium)
+library(GGally)
+library(mosaicData)
+library(caret)
+library(pROC)
+options(repos = c(CRAN = "https://cran.rstudio.com"))
+if (!requireNamespace("gradethis", quietly = TRUE)) {
+  learnr::tutorial_warning(
+    "This tutorial uses the **gradethis** package to provide feedback.  
+    It looks like you don’t have gradethis installed yet.  
+    Please run this in your console:
+    
+    remotes::install_github('rstudio-education/gradethis')"
+  )
+} else {
+  library(gradethis)
+  gradethis::gradethis_setup()  # optional: standardizes grading defaults
+}
+
+set.seed(144445)
+## teaching poisson regression 
+
+df1<-data.frame(lambda = "lambda = 0.5", y = rpois(500, .5))
+df2<-data.frame(lambda = "lambda = 1", y = rpois(500, 1))
+df3<-data.frame(lambda = "lambda = 3", y = rpois(500, 3))
+df4<-data.frame(lambda = "lambda = 6", y = rpois(500, 6))
+
+df<-rbind(df1, df2, df3, df4)
+df$lambda <- factor(df$lambda, levels = levels(factor(df$lambda))[c(2,1,3,4)])
+
+poiss_plots <- df |> ggplot(aes(x = y))+ facet_wrap(~lambda, scales = "free_y") + geom_bar() + 
+  labs(x = "distribution of observed counts", title = "Distribution of samples of Poisson random variables", subtitle = "N = 500",
+       caption = "Note: y axis scales vary by panel")+
+  theme_clean(base_size = 14)
+
+drinks <- data.frame(wknd_drinks = c(rpois(200, lambda = 5),rpois(200, lambda = 8)),
+                     group = c(rep("treat", 200),rep("control", 200)),
+                     age= rnorm(400, 20, .8))
+fit1<-glm(wknd_drinks ~ group, data=drinks, family = poisson)
+fit0 <- glm(wknd_drinks ~ 1, data=drinks, family = poisson)
+```
+
+
+```{r info-section, child = system.file("child_documents/info_section.Rmd", package = "tutorial.helpers")}
+```
+
+
+## Count outcomes
+###
+
+A couple of weeks ago, we reviewed linear regression for continuous outcomes. We then saw how the *generalized* linear model can adapt regression for binary outcomes with logistic regression. The GLM can be extended to other variable types as well - some that are not so obviously categorical, but are still technically "discrete" variables. 
+
+Consider these research questions: 
+
+1. Are the number of daily car accidents related to speed limit and roadway type (highway, state road, etc)? 
+2. Can a motivational interviewing intervention reduce the number of drinks per weekend for heavy-drinking college students? 
+3. Are there demographic associations with the number of psychopathology symptoms reported by medical students in residency? 
+
+###
+
+Each of these questions have response variables that are **counts** of the number of incidents recorded in a specific time interval. 
+
+How do count outcomes differ from binary variables? How do count outcomes differ from continuous variables? 
+
+### 
+
+Count outcomes are unique because they are discrete outcomes rather than continuous, but they are also not categorical in nature. Their defining feature is that they are bounded at 0: they cannot be negative. In theory, they can take on any positive value, so they have an interval of $[0, \inf]$.
+
+Counts also only take integer values, although the average is not restricted to an integer. 
+
+### 
+
+We often model counts as a **Poisson random variable**, and we can apply the GLM with an appropriate linking function. Recall the GLM with one explanatory variable:
+
+$$ g(Y) = \beta_0 + \beta_1 X_{1} $$ 
+
+### Poisson Distribution
+
+Let's consider some features of the Poisson distribution before we describe the linking function. 
+
+Recall for a normally distributed variable, we describe it in terms of parameters as $\sim N(\mu, \sigma^2)$. In a linear regression model, we are really interested in modeling $\mu$ as a straight line function of the explanatory variables.
+
+###
+
+The Poisson distribution is unique because there is only one parameter, $\lambda$. A Poisson random variable is described as $\sim Poisson(\lambda)$. $\lambda$ is the average number of occurrences/incidents/counts. 
+
+Interestingly, $\lambda$ is **both** the mean *and* the variance of the distribution. As the average number of incidents increases, the variability of number of incidents also increases. 
+
+### 
+
+Below is a panel of samples drawn from Poisson distributions with different $\lambda$'s. The shape changes as $\lambda$ increases.
+
+```{r plot, fig.height=5.25}
+poiss_plots
+```
+
+### 
+
+The mean and variance of each sample is:
+
+```{r table} 
+df |> group_by(lambda) |> 
+  summarize(mean = mean(y), var = var(y))
+```
+
+###
+
+If we model the average response in a linear regression: $\lambda_i = \beta+0 + \beta_1 x_i$, we run into two problems: the linear predictor can be negative, and the variance is **not** constant at different values of $x_i$. 
+
+![](https://bookdown.org/roback/bookdown-BeyondMLR/bookdown-BeyondMLR_files/figure-html/OLSpois-1.png){width=75%}
+
+###
+
+However, if we make the following link: 
+
+$$\log(\lambda_i) = \beta_0 + \beta_1 x_i$$ 
+
+then the *log* of the average number of incidents can take values from $[-\inf, \inf]$ and the linear model makes sense. 
+
+**important**: note that we are not modeling the log of the observed counts $Y$! We are modeling $\log(\lambda_i)$ where the observed values $Y_i$ follow a Poisson distribution with parameter $\lambda = \lambda_i$ for a given $x_i$. 
+
+### Assumptions
+
+The assumptions for Poisson regression are:
+
+1. The response us a count per unit of time and accurately follows a Poisson distribution
+2. The observations are independent of each other
+3. The mean is equal to the variance (connected to assumption 1).
+4. The log of the mean is a linear function of $x$. 
+
+### Example: weekend drinks
+
+Suppose a researcher has identified heavy-drinking undergraduate students at a public university. The researcher is testing a motivational interviewing intervention aimed at reducing "risky" drinking - abstinence is not necessarily the stated goal, but reduction in heavy drinking is. They have enrolled 400 students to be randomly assigned to treatment or control groups. After 4 weeks in the program, they followed up with the students after a random weekend and asked for the total drinks they consumed from Friday through Sunday. 
+
+The data are in the environment as `drinks`, with variables `wknd_drinks`, `group` [`control` or `treat`], and `age`. 
+
+### Exploratory Data Analysis 
+
+Let's visualize the distribution of drinks overall and for each group. 
+
+```{r eda1, exercise = TRUE}
+glimpse(drinks)
+
+```
+
+###
+
+Below, create a summary table of mean and variance of weekend drinks per group. 
+
+```{r eda2, exercise = TRUE}
+
+
+```
+
+### Poisson model fitting
+
+We can carry out Poisson regression in `R` using the `glm()` function, just like logistic regression. The only thing needed is one small change: 
+
+Recall that `family = ___` tells `R` the distributional family that the outcome comes from. We can change the family argument to `poisson`. 
+
+Below, start with a simple model of `wknd_drinks` regressed on `group`. 
+
+```{r fit1, exercise = TRUE}
+fit1 <- glm(___, data=drinks, ___ = poisson))
+summary(___)
+```
+
+###
+
+Like logistic regression, we have to consider the link function and its inverse to interpret the results. Logistic regression takes the log of the odds, and we exponentiate $\beta$ to get the Odds Ratio. 
+
+What is the link here? 
+
+###
+
+Poisson regression takes the log of the *rate*, or average number of occurrences. Once again, the inverse of the log is the exponential. Taking $\exp(\beta)$ gives us a multiplicative factor by which the mean count changes per one unit increase on $X$. 
+
+These estimates are often called the **rate ratio** or the **relative risk**. These represent the proportion of change in the outcome per unit change in $X$. 
+
+As with odds ratio, a rate ratio of 1.0 means no difference. Greater than 1 indicates an increase in the mean rate, and less than 1 indicates a decrease in the mean rate.
+
+###
+
+We can use `tidy(fit, exponentiate = TRUE)` to view the rate ratio for our model. 
+
+```{r fit2, exercise = TRUE}
+
+```
+
+###
+
+This indicates that the treatment is associated with approximately 40% decrease in the average number of weekend drinks, compared to the control group. 
+
+Conversely, we we can take the inverse of the rate ratio to get the opposite direction effect. $1 / 0.6 = 1.667$, meaning the control group has 66.7% higher expected consumption. 
+
+### Model Comparisons 
+
+As in logistic regression, Poisson regression depends on maximum likelihood estimates, and the **deviance** is calculated. The deviance is the difference between the observed model and a saturated model; it captures how much a model deviates from perfect fit. We want to minimize the deviance, so for model comparisons, we look to see if the reduction in deviance for a larger model is significantly better relative to a simpler model. 
+
+We can perform an analysis of deviance with the `anova()` function, just like last module. 
+
+For the sake of practice, below we fit an "intercept only" model. This is what as referred to as the null model, with no predictors included. We then compare fit1 to this model, called fit0. 
+
+
+```{r fit3, exercise = TRUE}
+fit0 <- glm(wknd_drinks ~ 1, #this indicates intercept only
+            drinks, family = poisson)
+anova(fit0, fit1)
+```
+
+###
+
+This comparison is actually the same information we get at the bottom of the `summary()` for a model, which provides the null deviance and the current model deviance:
+
+```{r fit4, exercise = TRUE}
+summary(fit1)
+```
+
+###
+
+Below, create `fit2`, which adds `age` as a covariate to the Poisson regression with `group`. Interpret the coefficients for `group` controlling for age and `age` controlling for group. Does the model fit improve? 
+
+
+```{r fit5, exercise = TRUE}
+
+```
+
+###
+
+The estimate indicates that the average number of weekend drinks actually decreases slightly with age, but this is not statistically significant. The model fit does not improve significantly, and the estimate of the treatment effect does not change much. 
+
+
+### Summary of Linear vs Poisson regression 
+
+|        | Linear Regre      | Poisson Regre |
+| ------ |---------------| ----------------|
+| Response	| Normal | Counts |
+| variance |  Equal  across $X$ | Takes on the mean at each level of $X$ |
+| fitting	| model $\mu$ with least squares | model $\log(\lambda)$ with MLE |
+| Comparing models| F tests and resid sums of squares | Drop in Deviance $\chi^2$ test |
+| Interpretation	| $\beta$: change in $\mu_y$ per change in $X$ | $\exp(\beta)$: rate of change in $\lambda$ per change in $X$ |
+
+
+
+## Zero-inflated models
+###
+
+[under construction]
+
+
+```{r download-answers, child = system.file("child_documents/download_answers.Rmd", package = "tutorial.helpers")}
+```
