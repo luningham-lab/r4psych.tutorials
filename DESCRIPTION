@@ -42,6 +42,8 @@ Imports:
     mosaicData,
     caret,
     pscl,
+    performance,
+    vcdExtra,
     pROC
 Remotes:
     rstudio-education/gradethis
