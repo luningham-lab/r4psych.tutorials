@@ -1,0 +1,78 @@
+dorm,drinks,group,off_campus,first_year
+mohn,0,treat,FALSE,TRUE
+rand,0,treat,FALSE,TRUE
+thorson,0,control,FALSE,TRUE
+mohn,0,treat,FALSE,TRUE
+ytterboe,0,control,FALSE,TRUE
+thorson,0,control,FALSE,TRUE
+melby,0,control,FALSE,TRUE
+thorson,0,treat,FALSE,TRUE
+larson,0,control,FALSE,TRUE
+melby,0,treat,FALSE,TRUE
+larson,0,control,FALSE,TRUE
+melby,0,treat,FALSE,TRUE
+mohn,0,control,FALSE,TRUE
+kildahl,0,treat,FALSE,TRUE
+larson,0,treat,FALSE,TRUE
+rand,0,control,FALSE,TRUE
+larson,0,treat,FALSE,TRUE
+hillboe,0,treat,FALSE,TRUE
+larson,0,treat,FALSE,TRUE
+melby,0,control,FALSE,TRUE
+mohn,0,control,FALSE,FALSE
+mohn,0,treat,FALSE,FALSE
+off campus,0,treat,TRUE,FALSE
+hillboe,0,control,FALSE,FALSE
+mohn,0,treat,FALSE,FALSE
+melby,0,treat,FALSE,FALSE
+mohn,0,treat,FALSE,FALSE
+kittlesby,0,control,FALSE,FALSE
+kildahl,0,treat,FALSE,FALSE
+kittlesby,0,treat,FALSE,FALSE
+larson,0,control,FALSE,FALSE
+melby,0,treat,FALSE,FALSE
+melby,0,treat,FALSE,FALSE
+thorson,0,control,FALSE,FALSE
+larson,0,treat,FALSE,FALSE
+mohn,0,treat,FALSE,FALSE
+mohn,1,treat,FALSE,FALSE
+mohn,1,treat,FALSE,FALSE
+ytterboe,1,control,FALSE,FALSE
+thorson,1,treat,FALSE,FALSE
+ytterboe,1,treat,FALSE,FALSE
+larson,1,treat,FALSE,FALSE
+melby,1,control,FALSE,FALSE
+mohn,1,treat,FALSE,FALSE
+larson,1,treat,FALSE,FALSE
+off campus,1,treat,TRUE,FALSE
+larson,2,control,FALSE,FALSE
+rand,2,treat,FALSE,FALSE
+ytterboe,2,treat,FALSE,FALSE
+ytterboe,2,control,FALSE,FALSE
+mohn,2,treat,FALSE,FALSE
+thorson,2,treat,FALSE,TRUE
+ytterboe,2,treat,FALSE,TRUE
+hillboe,3,treat,FALSE,TRUE
+hillboe,3,control,FALSE,TRUE
+mohn,3,treat,FALSE,FALSE
+larson,3,treat,FALSE,FALSE
+melby,3,control,FALSE,FALSE
+rand,3,treat,FALSE,FALSE
+melby,3,control,FALSE,FALSE
+melby,3,treat,FALSE,FALSE
+rand,4,treat,FALSE,FALSE
+larson,4,control,FALSE,FALSE
+thorson,4,treat,FALSE,FALSE
+off campus,4,treat,TRUE,FALSE
+ytterboe,5,treat,FALSE,FALSE
+ytterboe,5,control,FALSE,FALSE
+off campus,5,treat,TRUE,FALSE
+melby,5,control,FALSE,FALSE
+mohn,5,treat,FALSE,FALSE
+off campus,5,treat,TRUE,FALSE
+melby,6,control,FALSE,FALSE
+off campus,6,control,TRUE,FALSE
+thorson,7,control,FALSE,FALSE
+larson,10,control,FALSE,FALSE
+off campus,10,control,TRUE,FALSE
+ytterboe,22,control,FALSE,FALSE

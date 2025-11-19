@@ -39,6 +39,9 @@ library(GGally)
 library(mosaicData)
 library(caret)
 library(pROC)
+library(pscl)
+library(performance)
+library(vcdExtra)
 options(repos = c(CRAN = "https://cran.rstudio.com"))
 if (!requireNamespace("gradethis", quietly = TRUE)) {
   learnr::tutorial_warning(
@@ -74,6 +77,10 @@ drinks <- data.frame(wknd_drinks = c(rpois(200, lambda = 5),rpois(200, lambda = 
                      age= rnorm(400, 20, .8))
 fit1<-glm(wknd_drinks ~ group, data=drinks, family = poisson)
 fit0 <- glm(wknd_drinks ~ 1, data=drinks, family = poisson)
+fit2<-glm(wknd_drinks ~ group + age, data=drinks, family = poisson)
+drinks2 <- read_csv("data/drinks2.csv")
+
+fit3 <- glm(drinks ~ group + first_year + off_campus, data=drinks2, family = poisson)
 ```
 
 
@@ -265,10 +272,55 @@ Below, create `fit2`, which adds `age` as a covariate to the Poisson regression 
 
 The estimate indicates that the average number of weekend drinks actually decreases slightly with age, but this is not statistically significant. The model fit does not improve significantly, and the estimate of the treatment effect does not change much. 
 
+###
+
+Similar to prior regression model fits, we can use `broom` and `jtools` packages to make nicer tables and plots.
+
+```{r fit6, exercise = TRUE}
+___(fit2, exponentiate = T, conf.int = T) |> 
+  ___()
+```
+
+###
+
+We can make this even nicer with a little editing through `mutate(term)` and `rename()` from `dplyr`. See the example below: 
+
+```{r fit7, exercise = TRUE}
+tidy(fit2, exponentiate = T, conf.int = T) |> 
+  mutate(term = c("Intercept","Treatment (vs. Control)", "Age")) |> 
+  rename("Effect" = "term", "Coefficient" = "estimate", 
+         "SE" = "std.error", "Z" = "statistic", 
+         "p-value" = "p.value") |> 
+  nice_table()
+```
+
+###
+
+The `effect_plot()` function from `jtools` will accept a wide range of model fit objects, including `glm` with different families. We can visualize the marginal effects of predictors in the usual way: 
+
+```{r fit8, exercise = TRUE}
+effect_plot(fit2, ___ = "age", interval = TRUE, partial.residuals = TRUE)
+
+effect_plot(fit2, ___ = "group")
+```
+
+It is interesting to view the group effect for the raw data vs the partial residuals. Re-work the code above to do so. 
+
+###
+
+Finally, it sometimes makes sense to view the fitted values against the residuals. This is harder to interpret for categorical predictors, but the process of viewing the residuals is the same as in linear regression.
+
+We can use `augment()` with our fitted object. Note that `augment` recognizes that we have a `glm` object, and the default type of residual is the **deviance residuals**, which is exactly what we want. 
+
+```{r fit9, exercise = TRUE}
+augment(fit2) |> 
+  ggplot(aes(x = ___, y = ___)) + 
+  geom____() + geom_smooth()
+```
 
 ### Summary of Linear vs Poisson regression 
 
-|        | Linear Regre      | Poisson Regre |
+|        | Linear Reg      | Poisson Reg |
 | ------ |---------------| ----------------|
 | Response	| Normal | Counts |
 | variance |  Equal  across $X$ | Takes on the mean at each level of $X$ |
@@ -281,8 +333,140 @@ The estimate indicates that the average number of weekend drinks actually decrea
 ## Zero-inflated models
 ###
 
-[under construction]
+Our previous example study implemented a motivational interviewing intervention to reduce heavy drinking among "risky" drinking college students. 
 
+A grad student of the original investigator was hired as a faculty member at a different university and decided to re-test the intervention in a similar study. This new study followed a similar procedure but with the following differences: 
+
+* the study was smaller, with 77 total participants
+* the sample included the general student body, not individuals screened for risky drinking
+* the researcher wanted to prioritize the intervention because of the prior positive effects, so only 30 were assigned to `control`
+* we don't have student age, but we have an indicator if they were a first-year student, as well as if they live on or off campus
+
+###
+
+The data are loaded in the environment as `drinks2`. Let's look at the data and go over the columns and variable types:
+
+```{r zip1, exercise = TRUE}
+
+```
+
+### 
+
+As before, let's view the distribution of `drinks`, as well as `drinks` stratified by `group`. We may want to also view `drinks` stratified by `off_campus` and `first_year` to see if those should be included as covariates in the analysis. 
+
+```{r zip2, exercise = TRUE}
+p1 <- drinks2 |> ggplot(aes(x = drinks)) + geom_bar() 
+p1
+
+# p1 + ___
+```
+
+
+What do you notice about these distributions? 
+
+
+### 
+
+Let's fit a Poisson regression with all three variables included as predictors and examine the effect of the intervention. 
+
+```{r zip4, exercise = TRUE}
+fit3 <- ___(drinks ~ ___, data = drinks2, ___)
+summary(fit3)
+```
+
+### 
+
+Let's check the fitted vs the residuals. 
+
+```{r zip5, exercise = TRUE}
+augment(fit3, type.residuals = "deviance") |> 
+  ggplot(aes(x = .fitted, y=.resid))+
+  geom_point()+geom_smooth()
+```
+
+### 
+
+Hm. Notice that we have negative fitted values. That's a bit odd. 
+
+### 
+
+Run the following summary tables. Are there any potential issues here, statistically? 
+
+```{r zip6, exercise = TRUE}
+drinks2 |> summarize(mean(drinks), var(drinks))
+drinks2 |> group_by(group) |> summarize(mean(drinks), var(drinks))
+```
+
+### 
+
+Oh, we forgot to mention that the grad-student-turned-professor was hired at a small, religiously-affiliated university. Are there any potential issues here, practically speaking?
+
+### 
+
+From a statistical perspective, the variance is much larger than the mean of the counts. This is called **overdispersion**. Sometimes, overdispersion is part of the nature of the variable. 
+
+Other times, overdispersion is a consequence of **zero-inflated data**. 
+
+Either way, a Poisson distribution does not match the actual data, and Poisson regression is not the best model. 
+
+### 
+
+In this particular case, due to nature of alcohol consumption patterns in the general population, and the fact that the study sample comes from a religiously-affiliated university, we expect that there may be people who choose to abstain from alcohol completely. These individuals would certainly not benefit from a drinking reduction intervention, and they need to be modeled differently. 
+
+Abstainers are an example of something called **structural zeros**.
+
+There may also be individuals in the data who do drink occasionally, but they did not drink during the weekend of data collection for this particular study. These are referred to as **sampling zeros**.
+
+### 
+
+Statistically, we posit that the overall population is actually a *mixture* of two different sub-populations: abstainers and non-abstainers. The abstainers are modeled as having structural zeros. The non-obstainers are then modeled with a usual Poisson distribution. 
+
+This type of analysis is referred to as a zero-inflated Poisson model. It contains two separate model outputs: 
+
+* one model that is a logistic regression, modeling the probability of being a structural zero
+* one model that is a Poisson regression, modeling the counts
+
+### 
+
+Zero-inflated models are not part of `glm`. A package that handles this is `pscl`, which has a `zeroinfl()` function. It looks like other model fitting functions, but there is a new wrinkle in the `formula`. It looks like: 
+
+```
+zeroinfl(y ~ predictors + for + count_part | predictors + of + zero_part)
+```
+
+The count part and zero part can have the same predictors or different predictors, depending on the underlying hypotheses. 
+
+### 
+
+For our example, we saw that `first_year` had significantly lower expected drinks in the model and descriptively had a very high rate of zeros. We also want to see treatment group effects for both zeros and for the count part - we don't necessarily want the treatment group to have an over-representation of abstainers. So our model might look like: 
+
+```
+zeroinfl(drinks ~ off_campus + group | first_year + group)
+```
+
+### 
+
+Before we run the model, there are two ways we can inspect zero inflation. From the `performance` package, there is `check_zeroinflation()`, which receives a fitted count regression model. 
+From the `vcdExtra` package, there is `zero.test`, which takes the vector of the outcome variable and compares the observed zeros to the expected zeros under a Poisson. 
+
+```{r zip7, exercise = TRUE}
+check_zeroinflation(fit3) #from library(performance)
+zero.test(drinks2$drinks) # from library(vcdExtra)
+```
+
+###
+
+Now let's fit a zero inflated Poisson model: 
+
+```{r zip8, exercise = TRUE}
+zip.fit <- zeroinfl(drinks ~ off_campus + group| first_year + group, 
+                   data = drinks2)
+summary(zip.fit)
+```
+
+### 
+
+Next time: summaries/plots, marginal effects 
 
 ```{r download-answers, child = system.file("child_documents/download_answers.Rmd", package = "tutorial.helpers")}
 ```
