@@ -561,9 +561,16 @@ library(sjPlot)
 tab_model(zip.fit)
 ```
 
-We will examine some of the functionality of `tab_model` in our final lessons.
 
-###
+## Summary
+
+Poisson regression is an extension of the generalized linear model for count outcomes. 
+
+Zero-inflated Poisson is an extension that allows for excessive, "structural" zeros. 
+
+While ZIP is a great option when there are more zeros than expected, more complex model --> more difficult interpretation. 
+
+Not discussed here - mixture models are difficult to compare because they are not nested, even a Poisson compared to a ZIP with same predictors. A non-nested model test proposed by Vuong was once regularly used, but it is no longer considered valid for zero-inflated model comparisons. We use objective fit indices, like AIC or BIC, and theory/evidence of excessive zeros. 
 
 ```{r download-answers, child = system.file("child_documents/download_answers.Rmd", package = "tutorial.helpers")}
 ```
