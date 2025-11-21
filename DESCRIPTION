@@ -44,6 +44,7 @@ Imports:
     pscl,
     performance,
     vcdExtra,
+    sjPlot,
     pROC
 Remotes:
     rstudio-education/gradethis
