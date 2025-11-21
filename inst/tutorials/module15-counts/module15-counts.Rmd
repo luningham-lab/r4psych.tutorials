@@ -79,8 +79,10 @@ fit1<-glm(wknd_drinks ~ group, data=drinks, family = poisson)
 fit0 <- glm(wknd_drinks ~ 1, data=drinks, family = poisson)
 fit2<-glm(wknd_drinks ~ group + age, data=drinks, family = poisson)
 drinks2 <- read_csv("data/drinks2.csv")
-
+attach(drinks2)
 fit3 <- glm(drinks ~ group + first_year + off_campus, data=drinks2, family = poisson)
+zip.fit <- zeroinfl(drinks ~ off_campus + group| first_year + group, 
+                   data = drinks2)
 ```
 
 
@@ -512,12 +514,12 @@ With a `zeroinfl` model object, we can ask for different types of predicted outc
 
 Let's see these different modes below. Recall `emmeans` takes the model object, and then specification of which variables to calculate means for. We are interested in the `group` effect. `mode` is a new argument. 
 
-```{r zip9, exercise = TRUE, exercise.setup = "zip8"}
+```{r zip9, exercise = TRUE}
 emmeans(zip.fit, ~ group, mode = "count") # large counts because zeros excluded
 2.76/6.83 # estimated rate ratio!
 ```
 
-```{r zip10, exercise = TRUE, exercise.setup = "zip8"}
+```{r zip10, exercise = TRUE}
 emmeans(zip.fit, ~ group, mode = "zero")
 emmeans(zip.fit, ~ group, mode = "prob0")
 emmeans(zip.fit, ~ group, mode = "response")
@@ -527,7 +529,7 @@ emmeans(zip.fit, ~ group, mode = "response")
 
 To obtain a test of the treatment effect in the overall model: 
 
-```{r zip11, exercise = TRUE, exercise.setup = "zip8"}
+```{r zip11, exercise = TRUE}
 emmeans(zip.fit, pairwise~ group, mode = "response", infer= TRUE)
 ```
 
@@ -535,7 +537,7 @@ emmeans(zip.fit, pairwise~ group, mode = "response", infer= TRUE)
 
 `zeroinfl` model objects are not recognized by `effect_plot`, but we can use `emmip` to plot the effects. 
 
-```{r zip12, exercise = TRUE, exercise.setup = "zip8"}
+```{r zip12, exercise = TRUE}
 emmip(zip.fit, ~ group, mode="response", CIs = TRUE)
 ```
 
