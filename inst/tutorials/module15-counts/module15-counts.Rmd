@@ -516,13 +516,13 @@ Let's see these different modes below. Recall `emmeans` takes the model object, 
 
 
 ```{r zip9, exercise = TRUE}
-emmeans(zip.fit, ~ group, mode = "count") # large counts because zeros excluded
+emmeans(zip.fit, ~ group, mode = "count", data=drinks2) # large counts because zeros excluded
 2.76/6.83 # estimated rate ratio!
 ```
 
 
 ```{r zip10, exercise = TRUE}
-emmeans(zip.fit, ~ group, mode = "zero")
+emmeans(zip.fit, ~ group, mode = "zero", data = drinks2)
 emmeans(zip.fit, ~ group, mode = "prob0")
 emmeans(zip.fit, ~ group, mode = "response")
 ```
