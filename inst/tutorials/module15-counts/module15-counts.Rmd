@@ -464,9 +464,102 @@ zip.fit <- zeroinfl(drinks ~ off_campus + group| first_year + group,
 summary(zip.fit)
 ```
 
+Notes on interpretation: 
+
 ### 
 
-Next time: summaries/plots, marginal effects 
+* start with the logistic component (`Zero-inflation model coefficients (binomial with logit link):`)
+    + these are log-odds of "excess zeros", or the probability of being a structural zero 
+    + take `exp()` to get the odds ratio of being zero 
+    + in our data, being a first year student is highly predictive of also being an abstainer. `exp(2.66) = 14.25`, 14 times more likely to be zero than non-first year students 
+    + intervention group is not associated with zero-inflation (random assignment --> abstainers equally likely in each group)
+    
+###
+
+* viewing the count component: rate ratios for expected counts, *excluding structural zeros*
+    + treatment associated with `exp(-.9) = .40` reduction in rate of average drinks, compared to control
+    + i.e., if $\lambda$ is the average number of drinks in control, $0.4 \times \lambda$ is the average number of drinks in treatment
+    + caveats: (within rounding); (accounting for other variables)
+    + i.e., 60% reduction in average drinks 
+    + living off-campus associated with `exp(.49) = 1.63` increase in rate of average drinks compared to on-campus 
+
+###
+
+Note: We interpret the count part only for the observations that have a chance of being non-zero. In other words, this is the *conditional* treatment effect, conditional on being a non-abstainer. 
+
+However, any mixture model (like zero-inflated models) is subject to uncertainty and error. We don't actually group people into abstainers or non-abstainers; we have a probabilistic assignment of the mix of the two distributions. 
+
+It is also possible in some settings that the intervention may divert people into the structural zero part of the model.
+
+###
+
+A major limitation of zero-inflation models is getting a good interpretation of the treatment or intervention effect. This is an area of active research in alcohol intervention methodological literature. 
+
+If the model is not overly complex, we can use some familiar tools to get ***marginal*** treatment effect estimates: the model-predicted number of drinks combining both the *zero and non-zero* parts of the model. 
+
+### `emmeans()` for `zeroinfl`
+
+We can call on `emmeans()` to get the marginal means, averaged over other variables. This is usually only helpful if we have a categorical predictor or we have interaction terms in the model. 
+
+With a `zeroinfl` model object, we can ask for different types of predicted outcomes: 
+
+* `mode = "count"`: returns the predictions for the count part only
+* `mode = "zero"`: returns the predictions for the zero part only
+* `mode = "response"`: returns predicted counts combining both `zero` part and `count` part (**this is often what we want**)
+* `mode = "prob0"`: returns the probability of a zero, accounting for both parts of the model (also very helpful)
+
+### 
+
+Let's see these different modes below. Recall `emmeans` takes the model object, and then specification of which variables to calculate means for. We are interested in the `group` effect. `mode` is a new argument. 
+
+```{r zip9, exercise = TRUE, exercise.setup = "zip8"}
+emmeans(zip.fit, ~ group, mode = "count") # large counts because zeros excluded
+2.76/6.83 # estimated rate ratio!
+```
+
+```{r zip10, exercise = TRUE, exercise.setup = "zip8"}
+emmeans(zip.fit, ~ group, mode = "zero")
+emmeans(zip.fit, ~ group, mode = "prob0")
+emmeans(zip.fit, ~ group, mode = "response")
+```
+
+###
+
+To obtain a test of the treatment effect in the overall model: 
+
+```{r zip11, exercise = TRUE, exercise.setup = "zip8"}
+emmeans(zip.fit, pairwise~ group, mode = "response", infer= TRUE)
+```
+
+###
+
+`zeroinfl` model objects are not recognized by `effect_plot`, but we can use `emmip` to plot the effects. 
+
+```{r zip12, exercise = TRUE, exercise.setup = "zip8"}
+emmip(zip.fit, ~ group, mode="response", CIs = TRUE)
+```
+
+### 
+
+We can view any of the `modes`, i.e.: 
+
+```{r zip13, exercise = TRUE, exercise.setup = "zip8"}
+emmeans(zip.fit, ~ first_year, mode = "prob0")
+emmip(zip.fit, ~ first_year, mode="prob0", CIs = TRUE)
+```
+
+### 
+
+Finally, we need to make a better table to make sense of these results. Unfortunately, `zeroinf` is not recognized by `broom::tidy()` or `nice_table()`. There is a better option though: `tab_model()` from `sjPlot` package. 
+
+```{r zip14, exercise = TRUE, exercise.setup = "zip8"}
+library(sjPlot)
+tab_model(zip.fit)
+```
+
+We will examine some of the functionality of `tab_model` in our final lessons.
+
+###
 
 ```{r download-answers, child = system.file("child_documents/download_answers.Rmd", package = "tutorial.helpers")}
 ```
