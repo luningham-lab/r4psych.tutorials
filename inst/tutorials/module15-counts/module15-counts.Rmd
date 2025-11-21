@@ -514,10 +514,12 @@ With a `zeroinfl` model object, we can ask for different types of predicted outc
 
 Let's see these different modes below. Recall `emmeans` takes the model object, and then specification of which variables to calculate means for. We are interested in the `group` effect. `mode` is a new argument. 
 
+
 ```{r zip9, exercise = TRUE}
 emmeans(zip.fit, ~ group, mode = "count") # large counts because zeros excluded
 2.76/6.83 # estimated rate ratio!
 ```
+
 
 ```{r zip10, exercise = TRUE}
 emmeans(zip.fit, ~ group, mode = "zero")
@@ -537,7 +539,7 @@ emmeans(zip.fit, pairwise~ group, mode = "response", infer= TRUE)
 
 `zeroinfl` model objects are not recognized by `effect_plot`, but we can use `emmip` to plot the effects. 
 
-```{r zip12, exercise = TRUE}
+```{r zip12, exercise = TRUE, exercise.setup = "zip8"}
 emmip(zip.fit, ~ group, mode="response", CIs = TRUE)
 ```
 
