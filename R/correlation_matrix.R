@@ -1,15 +1,16 @@
 
+#' correlation matrix function
+#' @export
 
-
-correlation_matrix <- function(df, 
+correlation_matrix <- function(df,
                                type = "pearson",
-                               digits = 3, 
+                               digits = 3,
                                decimal.mark = ".",
-                               use = "all", 
-                               show_significance = TRUE, 
-                               replace_diagonal = FALSE, 
+                               use = "all",
+                               show_significance = TRUE,
+                               replace_diagonal = FALSE,
                                replacement = ""){
-  
+
   # check arguments
   stopifnot({
     is.numeric(digits)
@@ -21,30 +22,30 @@ correlation_matrix <- function(df,
   })
   # we need the Hmisc package for this
   require(Hmisc)
-  
+
   # retain only numeric and boolean columns
   isNumericOrBoolean = vapply(df, function(x) is.numeric(x) | is.logical(x), logical(1))
   if (sum(!isNumericOrBoolean) > 0) {
     cat('Dropping non-numeric/-boolean column(s):', paste(names(isNumericOrBoolean)[!isNumericOrBoolean], collapse = ', '), '\n\n')
   }
   df = df[isNumericOrBoolean]
-  
+
   # transform input data frame to matrix
   x <- as.matrix(df)
-  
+
   # run correlation analysis using Hmisc package
   correlation_matrix <- Hmisc::rcorr(x, type = )
   R <- correlation_matrix$r # Matrix of correlation coeficients
-  p <- correlation_matrix$P # Matrix of p-value 
-  
+  p <- correlation_matrix$P # Matrix of p-value
+
   # transform correlations to specific character format
   Rformatted = formatC(R, format = 'f', digits = digits, decimal.mark = decimal.mark)
-  
+
   # if there are any negative numbers, we want to put a space before the positives to align all
   if (sum(R < 0) > 0) {
     Rformatted = ifelse(R > 0, paste0(' ', Rformatted), Rformatted)
   }
-  
+
   # add significance levels if desired
   if (show_significance) {
     # define notions for significance levels; spacing is important.
@@ -55,7 +56,7 @@ correlation_matrix <- function(df,
   Rnew <- matrix(Rformatted, ncol = ncol(x))
   rownames(Rnew) <- colnames(x)
   colnames(Rnew) <- paste(colnames(x), "", sep =" ")
-  
+
   # replace undesired values
   if (use == 'upper') {
     Rnew[lower.tri(Rnew, diag = replace_diagonal)] <- replacement
@@ -64,6 +65,6 @@ correlation_matrix <- function(df,
   } else if (replace_diagonal) {
     diag(Rnew) <- replacement
   }
-  
+
   return(Rnew)
 }
