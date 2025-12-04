@@ -1,5 +1,5 @@
 
-#' correlation matrix function
+#' nice correlation matrix
 #' @export
 
 correlation_matrix <- function(df,
