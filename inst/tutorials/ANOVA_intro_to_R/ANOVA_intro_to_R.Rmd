@@ -1,0 +1,863 @@
+---
+title: "Introduction to R"
+subtitle: "PSYC 50523"
+author: "Justin Luningham"
+tutorial:
+  id: "ANOVA_intro_to_R"
+  name: "Introduction to R"
+output: 
+  learnr::tutorial:
+    progressive: true
+    allow_skip: true
+runtime: shiny_prerendered
+description: "A crash-course introduction to R, RStudio, and data analysis fundamentals for ANOVA"
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+library(knitr)
+library(kableExtra)
+library(dplyr)
+library(AMCP)
+options(max.print = 40)
+
+# gradethis for exercise checking (optional)
+if (requireNamespace("gradethis", quietly = TRUE)) {
+  library(gradethis)
+  gradethis::gradethis_setup()
+}
+
+knitr::opts_chunk$set(echo = TRUE, comment = "", warning = FALSE, message = FALSE)
+```
+
+## Welcome {data-progressive=FALSE}
+
+This tutorial provides a crash-course introduction to `R` with specific examples from our textbook. We will cover:
+
+- **R fundamentals**: the R environment, RStudio interface, objects, functions, and packages
+- **`dplyr`** for data manipulation
+- **Data summaries** and introduction to ANOVA in R
+
+`R` certainly has a learning curve to it, and it can be more complicated than other programs. This is because it is also very flexible and adaptable. `R` can accomplish complex and tedious computations in a few lines of code, but the tradeoff is that our code must be very precise.
+
+###
+
+**Estimated time:** ~1 hour
+
+**Tip:** Each section builds on the previous one. Use the navigation menu on the left to track your progress. Code exercises are interactive --- type your code and click **Run Code** to execute it.
+
+## Download R and RStudio
+
+Before we begin, make sure you have both `R` and RStudio installed:
+
+1. **Download R** from the Comprehensive R Archive Network: <https://cran.r-project.org/>
+2. **Download RStudio Desktop** from Posit: <https://posit.co/download/rstudio-desktop/>
+
+`R` is the engine. RStudio is the "integrated development environment" (IDE), with a graphical user interface, code help functions, workspace management, and data viewer tools.
+
+### The RStudio Environment
+
+RStudio includes 4 main windows (panes):
+
+- **Script editor** for writing, debugging, and saving code
+- **Console** where input and output are shown; code can also be typed here directly
+- **Environment** pane, which shows available data, saved objects, functions, and script history (also includes a point-and-click `Import Dataset` button)
+- **Utility** pane, which can show plots, tables, help windows, file paths, and a **Tutorial** tab
+
+### Working in R
+
+There are a few ways to execute code in RStudio:
+
+1. Type directly into the **Console** after the `>` prompt, and hit Enter
+2. Write code in the **Script editor**, highlight lines, and run them (`Run` button, Cmd+Return on Mac, Ctrl+Enter on Windows)
+3. More advanced: call and run an existing saved script from within a current script
+
+The script editor approach is preferred because syntax can be edited, reused, and --- importantly --- **saved** for future replication.
+
+## R Basics: Math and Objects
+
+### R as a calculator
+
+Below is your first view of a **code chunk**. This is equivalent to putting code into an R script and then running it or writing code in the console and hitting enter. These are built in to our learning modules for practice. 
+
+In the code chunk below, type `8 + 5` and click **Run Code**. 
+
+```{r math1, exercise=TRUE}
+
+```
+
+```{r math1-hint-1, eval=FALSE}
+8 + 5
+```
+
+###
+
+The result is printed, but it's not saved anywhere. If we wanted to use the number 13 again later, we'd have to retype the calculation. Instead, we can store it in an **object**.
+
+### The Assignment Operator
+
+To create an object, we use the **assignment operator**, `<-`. Assignments have the form:
+
+```{r, eval=FALSE}
+object <- value
+```
+
+We read this as: "the object **gets** this value."
+
+###
+
+Run the code below. The number 13 is now stored in the R environment under the name `thirteen`.
+
+```{r object1, exercise=TRUE}
+thirteen <- 13
+thirteen
+```
+
+###
+
+Assignments can also store the **result of a function**. Here the function is simply the `+` operation:
+
+```{r object2, exercise=TRUE}
+thirteen <- 8 + 5
+thirteen
+```
+
+###
+
+Once stored, we can use objects in future operations:
+
+```{r object3, exercise=TRUE}
+thirteen <- 8 + 5
+five <- 5
+thirteen + five
+```
+
+### Data Types
+
+We can assign anything to an object, not just numbers. For example, we can store text (called a **character** string) by using quotation marks:
+
+```{r types1, exercise=TRUE}
+thirteen <- "thirteen"
+thirteen
+```
+
+However, `R` is very sensitive to the **type** of element. The most common types are:
+
+- `numeric` (also called `double` or `dbl`) --- numbers
+- `character` (or `chr`) --- text strings
+- `factor` (or `fct`) --- categorical labels
+
+### 
+
+What happens if we try to add a character to a number? Try running the code below:
+
+```{r types2, exercise=TRUE}
+thirteen <- "thirteen"
+five <- 5
+thirteen + five
+```
+
+You'll get an error! The `str()` function reveals the **structure** of an object, which helps diagnose these issues:
+
+```{r types3, exercise=TRUE}
+thirteen <- "thirteen"
+five <- 5
+str(thirteen)
+str(five)
+```
+
+### Exercise: Objects
+
+Assign a number to the object `x1` and another number to the object `x2`. Then, assign their sum to the object `y`. Print `y` on its own line to verify the result.
+
+```{r exercise-objects, exercise=TRUE}
+
+```
+
+```{r exercise-objects-hint-1, eval=FALSE}
+x1 <- ___
+x2 <- ___
+y <- x1 + x2
+y
+```
+
+## Functions
+
+### What is a function?
+
+Functions are pre-built commands in `R` that perform specific operations. They have the general form:
+
+```{r, eval=FALSE}
+functionName(arg1 = val1, arg2 = val2, ...)
+```
+
+**Arguments** are provided within the parentheses. They tell the function what to operate on and how.
+
+### 
+
+We already saw `str()`, which displays the structure of any R object. Another example is `mean()`, which calculates the arithmetic mean. It requires an R object such as a numeric vector.
+
+To create a vector (a sequence of values), we use the `c()` function, which **combines** values:
+
+```{r func1, exercise=TRUE}
+mean(x = c(8, 5))
+```
+
+###
+
+Run the code below to see another useful function --- `summary()` --- applied to a vector:
+
+```{r func2, exercise=TRUE}
+my_data <- c(3, 7, 8, 5, 12, 10, 6)
+summary(my_data)
+```
+
+### Getting Help
+
+You can get help about any function by typing `?` followed by the function name in the console (e.g., `?mean`). In RStudio, the function's documentation will appear in the **Help** window of the utility pane.
+
+Documentation typically includes:
+
+- A description of what the function does
+- What arguments it requires
+- What output it produces
+- Examples
+
+### Exercise: Functions
+
+Use the `sd()` function to compute the standard deviation of the vector `c(4, 8, 15, 16, 23, 42)`.
+
+```{r exercise-functions, exercise=TRUE}
+
+```
+
+```{r exercise-functions-hint-1, eval=FALSE}
+sd(c(...))
+```
+
+## R Packages
+
+### Installing and Loading Packages
+
+`R` is open-source and has thousands of contributed packages on CRAN. Packages extend R's functionality for specific tasks.
+
+To use a package, two steps are required:
+
+1. **Install** the package (only once, or when updating):
+
+```{r, eval=FALSE}
+install.packages("dplyr")
+```
+
+2. **Load** it into the active library (every R session):
+
+```{r, eval=FALSE}
+library(dplyr)
+```
+
+###
+
+Notice the difference: `install.packages()` requires the package name in **quotes** (a character string), while `library()` does **not** require quotes.
+
+### Exercise: Packages
+
+In the code chunk below, write the two lines of code needed to first install the `psych` package, and then load it into the active library.
+
+```{r exercise-packages, exercise=TRUE}
+
+
+```
+
+```{r exercise-packages-hint-1, eval=FALSE}
+install.packages("psych")
+library(psych)
+```
+
+### Our Textbook Package: AMCP
+
+There is an R package associated with our textbook that provides all necessary data for examples. It is called `AMCP`:
+
+```{r, eval=FALSE}
+install.packages("AMCP")
+library(AMCP)
+```
+
+You can view all available datasets in the package by running `data(package = "AMCP")`. We'll use several of these datasets throughout this tutorial.
+
+## Reading and Viewing Data
+
+### Loading Built-in Data
+
+When a package provides datasets, we load them with the `data()` function. Run the code below to load and view a dataset from Chapter 1 of the textbook:
+
+```{r data1, exercise=TRUE}
+data(chapter_1_table_1)
+chapter_1_table_1
+```
+
+### The Data Frame
+
+This dataset is a **data frame** --- R's primary structure for storing tabular data (rows and columns). We can inspect its structure:
+
+```{r data2, exercise=TRUE}
+data(chapter_1_table_1)
+str(chapter_1_table_1)
+```
+
+### Accessing Parts of a Data Frame
+
+The **`$` operator** extracts a single variable (column) from a data frame:
+
+```{r data3, exercise=TRUE}
+data(chapter_1_table_1)
+chapter_1_table_1$treat
+```
+
+**Square brackets** `[ ]` allow subsetting by rows and columns using the form `data[row, column]`. If one dimension is left blank, all rows or all columns are returned:
+
+```{r data4, exercise=TRUE}
+data(chapter_1_table_1)
+# First 5 rows, all columns
+chapter_1_table_1[1:5, ]
+# All rows, just the "treat" column
+chapter_1_table_1[, "treat"]
+```
+
+### Creating New Variables
+
+You can add a new variable to a data frame using the `$` operator on the left side of an assignment:
+
+```{r data5, exercise=TRUE}
+data(chapter_1_table_1)
+chapter_1_table_1$Difference <- chapter_1_table_1$treat - chapter_1_table_1$control
+chapter_1_table_1
+```
+
+### The `summary()` Function for Data
+
+`summary()` is extremely useful for checking data. It provides numeric descriptions of quantitative variables and counts/frequencies for categorical variables.
+
+```{r data6, exercise=TRUE}
+data(chapter_1_table_1)
+summary(chapter_1_table_1)
+```
+
+To declare that a variable is categorical, we use the `factor()` function. This tells R to treat the numbers as group labels rather than quantities. Let's view the `week` variable as a factor.
+
+```{r data7, exercise=TRUE}
+factor(chapter_1_table_1$week)
+```
+
+## Data Manipulation with `dplyr`
+
+### Introduction to `dplyr`
+
+The `dplyr` package (the `d` is for "data frames", `plyr` is a reference to "pliers") provides a suite of intuitive functions for data manipulation. There are 5 core functions:
+
+- `select()` --- picks **variables** (columns) based on their names
+- `filter()` --- picks **cases** (rows) based on their values
+- `summarize()` --- reduces multiple values down to a single summary
+- `mutate()` --- adds new variables that are functions of existing variables
+- `arrange()` --- changes the ordering of rows
+
+### The Pipe Operator
+
+A unique and powerful feature of `dplyr` is the **pipe** operator: `|>`. Think of it as saying **"and then..."** 
+
+The pipe operator was first introduced as part of the `tidyverse`, but it is now built into base `R` (called "native pipe"). It can be inserted with `Ctrl + Shift + M`. 
+
+If you have learned to use the pipe before, you may have seen it as `%>%`. This is the `tidyverse` pipe. The native pipe `|>` is now preferred because its use does not depend on loading specific libraries. However, in practice, both will work if you load `dplyr`. 
+
+We specify a dataset, then pipe it through one or more operations:
+
+```{r, eval=FALSE}
+data |> 
+  do_something() |> 
+  do_something_else()
+```
+
+### `select()` --- Pick Columns
+
+```{r dplyr-setup}
+library(dplyr)
+library(AMCP)
+data(chapter_1_table_1)
+data(chapter_3_table_3)
+chapter_3_table_3 <- chapter_3_table_3 |> mutate(Condition = as.factor(Condition))
+```
+
+`select()` chooses which columns to keep. Run the examples below:
+
+```{r dplyr1, exercise=TRUE, exercise.setup="dplyr-setup"}
+chapter_1_table_1 |> 
+  select(treat)
+
+chapter_1_table_1 |> 
+  select(week, treat, control)
+```
+
+### `filter()` --- Pick Rows
+
+`filter()` keeps only rows that meet a condition:
+
+```{r dplyr2, exercise=TRUE, exercise.setup="dplyr-setup"}
+chapter_1_table_1 |> 
+  filter(week == 1)
+```
+
+Note the **double equals** `==` for logical comparison. A single `=` is used for assignment, like `<-`, but `==` directly compares if two objects or numbers are the same. It returns a `TRUE` or a `FALSE`. `filter` keeps only the rows where the condition is `TRUE`.
+
+### `summarize()` --- Compute Summaries
+
+`summarize()` collapses a dataset down to summary statistics. You provide specific functions (like `mean()`, `sd()`) inside it.
+
+The code below is multi-part: using the full data set, we then filter to only Week 1 observations, then we create a summary table containing the mean, sd, and total sum of the treatment group column.
+
+```{r dplyr3, exercise=TRUE, exercise.setup="dplyr-setup"}
+chapter_1_table_1 |> 
+  filter(week == 1) |> 
+  summarize(
+    Mean_treat = mean(treat), 
+    SD_treat = sd(treat), 
+    Sum_treat = sum(treat)
+  )
+```
+
+### `group_by()` + `summarize()` --- The Power Combo
+
+The `group_by()` function tells `dplyr` to perform subsequent operations **separately for each group**. This is extremely useful for ANOVA contexts:
+
+```{r dplyr4, exercise=TRUE, exercise.setup="dplyr-setup"}
+chapter_1_table_1 |> 
+  group_by(week) |> 
+  summarize(
+    Mean_treat = mean(treat), 
+    SD_treat = sd(treat)
+  )
+```
+
+### `mutate()` --- Create New Variables
+
+`mutate()` adds new columns to the data frame. The function form is `mutate(new_column_name = some_function(of_existing + columns)`:
+
+```{r dplyr5, exercise=TRUE, exercise.setup="dplyr-setup"}
+chapter_1_table_1 |> 
+  mutate(Difference = treat - control)
+```
+
+**Important:** The mutated data above is only **printed**, not saved. To save changes, assign the result back to an object:
+
+```{r, eval=FALSE}
+chapter_1_table_1 <- chapter_1_table_1 |> 
+  mutate(Difference = treat - control)
+```
+
+### `count()` --- Quick Frequency Tables
+
+`count()` is a handy shortcut for tallying up frequencies of categorical variables:
+
+```{r dplyr6, exercise=TRUE, exercise.setup="dplyr-setup"}
+chapter_3_table_3 |> 
+  count(Condition)
+```
+
+### Exercise: `dplyr` Pipeline
+
+Using the `chapter_3_table_3` dataset (already loaded), write a `dplyr` pipeline that:
+
+1. Groups by `Condition`
+2. Summarizes the mean and standard deviation of `Rating`
+
+```{r exercise-dplyr, exercise=TRUE, exercise.setup="dplyr-setup"}
+
+```
+
+```{r exercise-dplyr-hint-1, eval=FALSE}
+chapter_3_table_3 |> 
+  group_by(___) |> 
+  summarize(
+    Mean_Rating = mean(___), 
+    SD_Rating = sd(___)
+  )
+```
+
+```{r exercise-dplyr-solution}
+chapter_3_table_3 |> 
+  group_by(Condition) |> 
+  summarize(
+    Mean_Rating = mean(Rating), 
+    SD_Rating = sd(Rating)
+  )
+```
+
+## Visualizing Data
+
+### Base R Plots
+
+R has many built-in functions for making simple plots. The `boxplot()` function requires a **formula** of the form `dependent_variable ~ grouping_variable`:
+
+```{r viz-setup, echo = F}
+library(ggplot2)
+data(chapter_3_table_3)
+chapter_3_table_3 <- chapter_3_table_3 |> mutate(Condition = as.factor(Condition))
+```
+
+```{r viz1, exercise=TRUE, exercise.setup="viz-setup"}
+boxplot(Rating ~ Condition,
+        data = chapter_3_table_3,
+        ylab = "Global Affect Rating", 
+        xlab = "Group",
+        main = "Box and Whiskers Plot of Affect Rating by Group",
+        col = "bisque",
+        names = c("Pleasant", "Neutral", "Unpleasant"))
+```
+
+### Histograms
+
+A histogram shows the distribution of a single variable. One simple function for a histogram is simply called `hist()`. The `lines` function adds lines on an existing plot, and `density` will create a smooth probability curve on top of the histogram bars:
+
+```{r viz2, exercise=TRUE, exercise.setup="viz-setup"}
+hist(chapter_3_table_3$Rating, #provide the single column of data
+     probability = TRUE, #y-axis as counts or proportions
+     main = "Histogram and Estimated Density Line") #main = "Title"
+lines(density(chapter_3_table_3$Rating))
+```
+
+### Introduction to `ggplot2`
+
+The `ggplot2` package can produce elegant, publication-quality plots. It has some unique conventions:
+
+- `ggplot()` initializes a plot, specifying the data and "aesthetics" (`aes()`) --- what variable maps to x, y, color, etc.
+- Layers are **added** with `+` (similar in spirit to the `|>` pipe)
+- Different plot types are called **geoms** (e.g., `geom_histogram()`, `geom_boxplot()`)
+- `facet_wrap()` splits a plot by levels of a categorical variable
+- `theme_bw()` provides a clean black-and-white theme
+
+```{r viz3, exercise=TRUE, exercise.setup="viz-setup"}
+ggplot(chapter_3_table_3, aes(x = Rating)) +
+  geom_histogram() +
+  facet_wrap(~ Condition) +
+  theme_bw(base_size = 16)
+```
+
+### Exercise: Create a Plot
+
+Using the `chapter_3_table_3` data, create a `ggplot` **boxplot** of `Rating` by `Condition`. Fill in the blanks:
+
+```{r exercise-viz, exercise=TRUE, exercise.setup="viz-setup"}
+ggplot(chapter_3_table_3, aes(x = ___, y = ___)) +
+  geom____() +
+  theme_bw()
+```
+
+```{r exercise-viz-hint-1, eval=FALSE}
+ggplot(chapter_3_table_3, aes(x = Condition, y = Rating)) +
+  geom_boxplot() +
+  theme_bw()
+```
+
+```{r exercise-viz-solution}
+ggplot(chapter_3_table_3, aes(x = Condition, y = Rating)) +
+  geom_boxplot() +
+  theme_bw()
+```
+
+## Summaries and ANOVA in R
+
+### From Summaries to ANOVA
+
+Let's bring together what we've learned. Using `dplyr`, we can replicate summary tables needed for ANOVA. Here's a summary of the mood induction data from Chapter 3:
+
+```{r anova-setup, echo = F}
+library(dplyr)
+library(AMCP)
+data(chapter_3_table_3)
+chapter_3_table_3 <- chapter_3_table_3 |> mutate(Condition = as.factor(Condition))
+```
+
+```{r anova1, exercise=TRUE, exercise.setup="anova-setup"}
+Summary.Mood <- chapter_3_table_3 |> 
+  group_by(Condition) |>
+  summarize(
+    Sum.Y = sum(Rating),
+    Y.bar = mean(Rating),
+    n = n()
+  )
+
+Summary.Mood
+```
+
+### The `aov()` Function
+
+The basic R function to compute an ANOVA is `aov()`. It requires a **formula** (`dependent_var ~ independent_var`) and the dataset as primary arguments. 
+
+We typically save the results of the `aov()` function through assignment, and then we can use a helper function called `summary()` to view the results.
+
+**Important:** The independent variable must be a **factor** for `aov()` to work correctly. I've already done this, but the commented-out code below shows how.
+
+```{r anova3, exercise=TRUE, exercise.setup="anova-setup"}
+#chapter_3_table_3 <- chapter_3_table_3 |> 
+  #mutate(Condition = as.factor(Condition)) 
+model1 <- aov(Rating ~ Condition, data = chapter_3_table_3)
+summary(model1)
+```
+
+
+### Computing ANOVA Step by Step
+
+We can compute the elements of an ANOVA by hand in R. First, let's set up placeholders:
+
+```{r anova2, exercise=TRUE, exercise.setup="anova-setup"}
+# Number of groups and total N
+a <- length(unique(chapter_3_table_3$Condition))
+N <- nrow(chapter_3_table_3)
+
+# Full model errors (sum of within-group SS)
+Summary.Mood <- chapter_3_table_3 |> 
+  group_by(Condition) |>
+  summarize(SSE = sum((Rating - mean(Rating))^2))
+
+E.F <- sum(Summary.Mood$SSE)
+df.F <- N - a
+
+# Restricted model errors (total SS from grand mean)
+E.R <- sum((chapter_3_table_3$Rating - mean(chapter_3_table_3$Rating))^2)
+df.R <- N - 1
+
+# F statistic
+F_stat <- ((E.R - E.F) / (df.R - df.F)) / (E.F / df.F)
+
+cat("F =", F_stat, "\n")
+cat("Critical value =", qf(.95, df.R - df.F, df.F), "\n")
+cat("p-value =", 1 - pf(F_stat, df.R - df.F, df.F), "\n")
+```
+
+
+### A Common Pitfall: Factor Variables
+
+A very common mistake is forgetting to convert grouping variables to factors. Look what happens with the alcoholism treatment data:
+
+```{r anova4, exercise=TRUE, exercise.setup="anova-setup"}
+data(chapter_3_table_7_raw)
+str(chapter_3_table_7_raw)
+
+# Group is numeric, not factor --- this gives wrong results!
+mdl_wrong <- aov(Drinks ~ Group, data = chapter_3_table_7_raw)
+summary(mdl_wrong)
+```
+
+Notice there's only 1 degree of freedom for Group --- R is treating it as a continuous number! The fix:
+
+```{r anova5, exercise=TRUE, exercise.setup="anova-setup"}
+data(chapter_3_table_7_raw)
+
+chapter_3_table_7_raw <- chapter_3_table_7_raw |> 
+  mutate(Group = as.factor(Group))
+
+mdl_correct <- aov(Drinks ~ Group, data = chapter_3_table_7_raw)
+summary(mdl_correct)
+```
+
+Now we get the correct degrees of freedom for 5 groups.
+
+## Checking Assumptions
+
+### Why Check Assumptions?
+
+Before trusting ANOVA results, we should verify:
+
+1. The dependent variable is approximately **normally distributed** within groups
+2. Groups have approximately **equal variances** (homogeneity of variance)
+
+Visualizations are the first step.
+
+```{r assume-setup, echo=F}
+library(dplyr)
+library(AMCP)
+library(ggplot2)
+data(chapter_3_table_3)
+chapter_3_table_3 <- chapter_3_table_3 |> mutate(Condition = as.factor(Condition))
+```
+
+### Histograms by Group
+
+Use `ggplot2` with `facet_wrap()` to check normality within each group:
+
+```{r assume1, exercise=TRUE, exercise.setup="assume-setup"}
+ggplot(chapter_3_table_3, aes(x = Rating)) +
+  geom_histogram(bins = 6) +
+  facet_wrap(~ Condition) +
+  theme_bw(base_size = 16)
+```
+
+### Means and Variability
+
+We can use the `gplots` package's `plotmeans()` function to visualize group means with confidence intervals, which helps assess equal variance:
+
+```{r assume2, exercise=TRUE, exercise.setup="assume-setup"}
+library(gplots)
+plotmeans(Rating ~ Condition, 
+          data = chapter_3_table_3, 
+          connect = FALSE,
+          main = "Confidence Interval Plot")
+```
+
+### Exercise: Check Assumptions
+
+Load the `chapter_3_exercise_19` dataset (an anger study with 4 conditions). Convert `Condition` to a factor, then create a boxplot to visually inspect the distributions:
+
+```{r exercise-assume, exercise=TRUE, exercise.setup="assume-setup"}
+data(chapter_3_exercise_19)
+
+# Step 1: Convert Condition to factor
+
+
+# Step 2: Create a boxplot of Anger by Condition
+
+
+```
+
+```{r exercise-assume-hint-1, eval=FALSE}
+data(chapter_3_exercise_19)
+chapter_3_exercise_19 <- chapter_3_exercise_19 |> 
+  mutate(Condition = as.factor(Condition))
+
+boxplot(Anger ~ Condition, 
+        data = chapter_3_exercise_19,
+  #below is simply changing the appearance with color and axis labels
+        col = "#4d1979",
+        ylab = "Anger", xlab = "Condition")
+```
+
+## Practice: Full Analysis
+
+### Putting It All Together
+
+Now it's your turn. Using the `chapter_3_exercise_19` dataset (already loaded from the previous exercise), carry out a complete mini-analysis:
+
+1. Compute group means and SDs
+2. Run an ANOVA
+3. Interpret the result
+
+```{r practice-setup}
+# below is already run to load and setup the data.
+library(dplyr)
+library(AMCP)
+data(chapter_3_exercise_19)
+chapter_3_exercise_19 <- chapter_3_exercise_19 |> mutate(Condition = as.factor(Condition))
+```
+
+**Step 1:** Create a summary of the mean and SD of `Anger` by `Condition`.
+
+```{r practice1, exercise=TRUE, exercise.setup="practice-setup"}
+
+```
+
+```{r practice1-hint-1, eval=FALSE}
+chapter_3_exercise_19 |> 
+  group_by(___) |> 
+  summarize(Mean = ___(Anger), SD = sd(Anger))
+```
+
+###
+
+**Step 2:** Run an ANOVA using `aov()` and `summary()`.
+
+```{r practice2, exercise=TRUE, exercise.setup="practice-setup"}
+
+```
+
+```{r practice2-hint-1, eval=FALSE}
+mdl <- aov(Anger ~ Condition, data = chapter_3_exercise_19)
+summary(mdl)
+```
+
+###
+
+**Step 3:** Based on the ANOVA output above, can we reject the null hypothesis of equivalence across the 4 groups? Why or why not?
+
+```{r practice3, echo=FALSE}
+question_text(
+  "Write your interpretation of the ANOVA result:",
+  answer(NULL, correct = TRUE),
+  allow_retry = TRUE,
+  try_again_button = "Edit Answer",
+  incorrect = NULL,
+  rows = 4
+)
+```
+
+## Knowledge Check
+
+```{r quiz-final, echo=FALSE}
+quiz(
+  caption = "Test Your Understanding",
+  
+  question("What is the assignment operator in R?",
+    answer("=", message = "This can work for assignment in some contexts, but it's not the standard R assignment operator."),
+    answer("==", message = "This is the logical equality operator, used for comparisons."),
+    answer("<-", correct = TRUE),
+    answer("->", message = "This works but is unconventional. The standard operator points left."),
+    allow_retry = TRUE
+  ),
+  
+  question("Which dplyr function would you use to compute a mean for each group?",
+    answer("filter() with mean()"),
+    answer("select() with mean()"),
+    answer("group_by() with summarize()", correct = TRUE),
+    answer("mutate() with mean()", message = "mutate creates a new column but doesn't collapse to group summaries."),
+    allow_retry = TRUE
+  ),
+  
+  question("Why must we convert grouping variables to factors before running aov()?",
+    answer("R cannot handle numeric variables"),
+    answer("Factors are always required in R"),
+    answer("Without conversion, R treats the variable as continuous and computes the wrong degrees of freedom", correct = TRUE),
+    answer("It's just a convention with no practical effect"),
+    allow_retry = TRUE
+  ),
+  
+  question("In ggplot2, how do you add layers to a plot?",
+    answer("Using the pipe operator |>", message = "The pipe is for dplyr. ggplot2 uses a different operator."),
+    answer("Using the + operator", correct = TRUE),
+    answer("Using the & operator"),
+    answer("Nesting functions inside ggplot()"),
+    allow_retry = TRUE
+  ),
+  
+  question("What does the formula 'Rating ~ Condition' mean in the context of aov()?",
+    answer("Rating equals Condition"),
+    answer("Rating is predicted by (or grouped by) Condition", correct = TRUE),
+    answer("Condition is the dependent variable"),
+    answer("Rating and Condition are independent"),
+    allow_retry = TRUE
+  )
+)
+```
+
+## Summary and Next Steps
+
+### What We Covered
+
+In this tutorial, you learned:
+
+- How to use **objects** and the **assignment operator** (`<-`) in R
+- The concept of **data types** (`numeric`, `character`, `factor`) and why they matter
+- How to use **functions** and get help with `?`
+- How to **install and load packages**
+- How to **read, view, and manipulate data** with base R and `dplyr`
+- The 5 core `dplyr` verbs: `select()`, `filter()`, `summarize()`, `mutate()`, `arrange()`
+- How to create **visualizations** with base R plots and `ggplot2`
+- How to compute and interpret an **ANOVA** in R using `aov()`
+- The importance of **checking assumptions** and converting variables to **factors**
+
+### Tips for Success
+
+- **Save your scripts.** Reproducibility is a key advantage of R.
+- **Use `?function_name`** liberally. The documentation is thorough.
+- **Read error messages carefully.** They often tell you exactly what went wrong.
+- **Practice.** The more you use R, the more natural it becomes.
+
+### 
+
+Thank you for completing this tutorial! You now have the foundational skills to work with R throughout this course. We will build on these concepts extensively as we cover more complex ANOVA designs.

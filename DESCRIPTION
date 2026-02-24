@@ -45,6 +45,9 @@ Imports:
     performance,
     vcdExtra,
     sjPlot,
+    gplots,
+    AMCP,
+    kableExtra,
     pROC
 Remotes:
     rstudio-education/gradethis
