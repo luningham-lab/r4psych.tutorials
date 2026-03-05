@@ -1,0 +1,537 @@
+---
+title: "One-Way Contrasts in R"
+subtitle: "PSYC 50523"
+author: "Justin Luningham"
+tutorial:
+  id: "ANOVA_one-way_contrasts"
+  name: "One-Way Contrasts"
+output: 
+  learnr::tutorial:
+    progressive: true
+    allow_skip: true
+runtime: shiny_prerendered
+description: "Pairwise and complex comparisons using aov() and emmeans"
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+library(knitr)
+library(kableExtra)
+library(dplyr)
+library(AMCP)
+library(emmeans)
+options(max.print = 40)
+
+if (requireNamespace("gradethis", quietly = TRUE)) {
+  library(gradethis)
+  gradethis::gradethis_setup()
+}
+
+knitr::opts_chunk$set(echo = TRUE, comment = "", warning = FALSE, message = FALSE)
+```
+
+## Welcome {data-progressive=FALSE}
+
+In this tutorial, we will build on what we learned in the Introduction to R module. We will:
+
+- Review the one-way ANOVA using `aov()`
+- Introduce the `emmeans` package for **estimated marginal means**
+- Conduct **pairwise comparisons** as follow-up tests after a significant omnibus ANOVA
+- Set up and test **complex (custom) contrasts**
+
+This tutorial assumes you are comfortable with loading packages, using `dplyr` and the pipe operator, converting variables to factors, and running `aov()`. If any of that is unfamiliar, revisit the Introduction to R tutorial first.
+
+###
+
+**Estimated time:** ~30 minutes
+
+## A Motivating Example
+
+### The Hypertension Data
+
+Table 4.1 from the text presents hypothetical data for four groups of participants receiving different hypertension treatments, measured on systolic blood pressure. The four treatment groups are: Drug Therapy, Biofeedback, Diet, and Combination.
+
+Let's start by loading and preparing the data. We will use `case_match()` from `dplyr` to recode the numeric condition variable into meaningful labels. Recall from the first tutorial that `mutate()` adds or modifies columns in a data frame, and that grouping variables must be converted to **factors** for ANOVA.
+
+
+```{r data1, exercise=TRUE}
+library(dplyr)
+library(AMCP)
+
+data(C4T1)
+
+head(C4T1)
+str(C4T1)
+```
+
+###
+
+Now let's recode the conditions and convert to factors. The `case_match()` function takes the variable to recode, then a series of formulas: `old_value ~ "new_label"`. We wrap this inside `mutate()` to create the new variable:
+
+```{r data2, exercise=TRUE}
+C4T1 <- C4T1 |> 
+  mutate(group = case_match(cond,
+    1 ~ "Drug Therapy",
+    2 ~ "Biofeedback",
+    3 ~ "Diet",
+    4 ~ "Combination"
+  )) |>
+  mutate(group = factor(group), cond = factor(cond))
+
+str(C4T1)
+```
+
+Notice the use of the **native pipe** `|>`. This works the same as the `%>%` pipe from the first tutorial --- it passes the result on the left into the first argument of the function on the right. The `|>` pipe is built into base R (version 4.1+), so it does not require any additional packages.
+
+### Group Summary Statistics
+
+Let's recreate the summary table from the text, as we practiced in the first tutorial with `group_by()` and `summarize()`:
+
+```{r data3, exercise=TRUE,exercise.setup="data2"}
+Summary.4.1 <- C4T1 |> 
+  group_by(group) |>
+  summarize(
+    Mean = mean(bloodpr),
+    Median = median(bloodpr),
+    Var = var(bloodpr),
+    SD = sd(bloodpr),
+    n = n()
+  )
+
+Summary.4.1
+```
+
+### Exercise: Visualize the Data
+
+Before running any statistical tests, create a boxplot of `bloodpr` by `group` to visually inspect the distributions. Use either base R `boxplot()` or `ggplot2`.
+
+```{r exercise-viz, exercise=TRUE, exercise.setup="data2"}
+
+```
+
+```{r exercise-viz-hint-1, eval=FALSE}
+boxplot(bloodpr ~ group, 
+        data = C4T1,
+        col = "bisque",
+        ylab = "Blood Pressure", 
+        xlab = "Treatment Group")
+```
+
+## The Omnibus ANOVA
+
+### Running `aov()`
+
+As we learned in the first tutorial, `aov()` requires a **formula** (`dependent ~ independent`) and the dataset. Let's run the omnibus one-way ANOVA:
+
+```{r omnibus-setup, echo=FALSE}
+library(dplyr)
+library(AMCP)
+library(emmeans)
+library(ggplot2)
+
+data(chapter_4_table_1)
+C4T1 <- chapter_4_table_1
+
+C4T1 <- C4T1 |> 
+  mutate(group = case_match(cond,
+    1 ~ "Drug Therapy",
+    2 ~ "Biofeedback",
+    3 ~ "Diet",
+    4 ~ "Combination"
+  )) |>
+  mutate(group = factor(group), cond = factor(cond))
+```
+
+```{r omnibus1, exercise=TRUE, exercise.setup="omnibus-setup"}
+mdl <- aov(bloodpr ~ group, data = C4T1)
+summary(mdl)
+```
+
+###
+
+The omnibus F-test tells us whether there is *any* significant difference among the four group means. If the p-value is below our alpha level, we reject the null hypothesis that all group means are equal.
+
+But the omnibus test doesn't tell us **where** the differences are. For that, we need follow-up comparisons --- and this is where `emmeans` comes in.
+
+```{r quiz-omnibus, echo=FALSE}
+question_text(
+  "Based on the omnibus ANOVA output above, is the overall F-test significant at alpha = .05? What does this tell us (and what does it NOT tell us)?",
+  answer(NULL, correct = TRUE),
+  allow_retry = TRUE,
+  try_again_button = "Edit Answer",
+  incorrect = NULL,
+  rows = 4
+)
+```
+
+## Introduction to `emmeans`
+
+### What is `emmeans`?
+
+The `emmeans` package (Estimated Marginal Means) is a powerful and flexible tool for conducting follow-up comparisons after fitting a model. It can handle:
+
+- **Pairwise comparisons** between all group means
+- **Custom (complex) contrasts** that test specific hypotheses
+- Adjustments for **multiple comparisons** (e.g., Tukey, Bonferroni)
+- Comparisons in more complex designs (factorial, repeated measures --- we will cover these later)
+
+The basic workflow is:
+
+1. Fit a model with `aov()` (or `lm()`)
+2. Extract the estimated marginal means with `emmeans()`
+3. Conduct comparisons with `pairs()` or `contrast()`
+
+###
+
+To install `emmeans` (if you haven't already):
+
+```{r, eval=FALSE}
+install.packages("emmeans")
+library(emmeans)
+```
+
+### Estimated Marginal Means
+
+The first step after fitting a model is to extract the estimated marginal means (EMMs). These are the model-based estimates of each group mean.
+
+The `emmeans()` function requires an already fitted model as its argument. In other words, we assign the `aov()` result to an object, then provide that object to `emmeans()`. It recognizes the original data and the variable names for the groups. 
+
+To get the groups, we ask for part of the formula again, with ` ~ group_var_name` within in the function. 
+
+```{r emmeans-setup, echo=FALSE}
+library(dplyr)
+library(AMCP)
+library(emmeans)
+library(ggplot2)
+
+data(chapter_4_table_1)
+C4T1 <- chapter_4_table_1
+
+C4T1 <- C4T1 |> 
+  mutate(group = case_match(cond,
+    1 ~ "Drug Therapy",
+    2 ~ "Biofeedback",
+    3 ~ "Diet",
+    4 ~ "Combination"
+  )) |>
+  mutate(group = factor(group), cond = factor(cond))
+
+#mdl <- aov(bloodpr ~ group, data = C4T1)
+```
+
+```{r emm1, exercise=TRUE, exercise.setup="emmeans-setup"}
+mdl <- aov(bloodpr ~ group, data = C4T1)
+emm <- emmeans(mdl, ~ group)
+emm
+```
+
+The output shows each group's estimated mean, the standard error, degrees of freedom, and a confidence interval. In a balanced one-way design, these estimated means are identical to the simple group means we computed with `summarize()`. The advantage of `emmeans` becomes clear in more complex or unbalanced designs, and --- as we'll see next --- for conducting comparisons.
+
+## Pairwise Comparisons
+
+### All Pairwise Tests
+
+The simplest follow-up after a significant omnibus ANOVA is to compare every pair of group means. The `pairs()` function does this automatically:
+
+```{r pairs1, exercise=TRUE, exercise.setup="emmeans-setup"}
+mdl <- aov(bloodpr ~ group, data = C4T1)
+emm <- emmeans(mdl, ~ group)
+pairs(emm)
+```
+
+###
+
+By default, `pairs()` applies a **Tukey adjustment** for multiple comparisons, which controls the familywise error rate across all pairwise tests. The output shows the estimated difference (`estimate`), standard error, degrees of freedom, t-ratio, and the adjusted p-value for each pair.
+
+### Changing the Adjustment Method
+
+You can change the p-value adjustment method with the `adjust` argument. Common options include `"tukey"` (default), `"bonferroni"`, `"sheffe"`, `"dunnettx"`, `"fdr"` (Benjamini-Hochberg), and `"none"`:
+
+```{r pairs2, exercise=TRUE, exercise.setup="emmeans-setup"}
+mdl <- aov(bloodpr ~ group, data = C4T1)
+emm <- emmeans(mdl, ~ group)
+
+# No adjustment (unadjusted p-values)
+pairs(emm, adjust = "none")
+```
+
+###
+
+```{r pairs3, exercise=TRUE, exercise.setup="emmeans-setup"}
+mdl <- aov(bloodpr ~ group, data = C4T1)
+emm <- emmeans(mdl, ~ group)
+
+# Bonferroni adjustment
+pairs(emm, adjust = "bonferroni")
+```
+
+### Exercise: Interpret Pairwise Comparisons
+
+Run the pairwise comparisons with Tukey adjustment and answer the question below.
+
+```{r exercise-pairs, exercise=TRUE, exercise.setup="emmeans-setup"}
+mdl <- aov(bloodpr ~ group, data = C4T1)
+emm <- emmeans(mdl, ~ group)
+pairs(emm)
+```
+
+```{r quiz-pairs, echo=FALSE}
+question_text(
+  "Which pair(s) of groups show a statistically significant difference at alpha = .05 after Tukey adjustment? What does this tell us about the hypertension treatments?",
+  answer(NULL, correct = TRUE),
+  allow_retry = TRUE,
+  try_again_button = "Edit Answer",
+  incorrect = NULL,
+  rows = 4
+)
+```
+
+## Custom (Complex) Contrasts
+
+### Beyond Pairwise Comparisons
+
+Pairwise comparisons test every possible pair, but sometimes we have specific, theory-driven hypotheses. For example:
+
+- Does the **Combination** treatment differ from the average of the other three treatments?
+- Do the **non-drug treatments** (Biofeedback, Diet, Combination) differ from **Drug Therapy** alone?
+
+These are **complex contrasts** --- comparisons that involve more than two groups at a time. The `emmeans` package handles these with the `contrast()` function.
+
+### Setting Up Custom Contrasts
+
+To define a custom contrast, we create a named *list* of coefficient vectors. Each vector must have one value per group, and the coefficients must sum to zero (the definition of a contrast).
+
+First, let's check the order of the groups in our `emmeans` object, since the coefficients must match this order:
+
+```{r custom-setup, echo=FALSE}
+library(dplyr)
+library(AMCP)
+library(emmeans)
+
+data(chapter_4_table_1)
+C4T1 <- chapter_4_table_1
+
+C4T1 <- C4T1 |> 
+  mutate(group = case_match(cond,
+    1 ~ "Drug Therapy",
+    2 ~ "Biofeedback",
+    3 ~ "Diet",
+    4 ~ "Combination"
+  )) |>
+  mutate(group = factor(group), cond = factor(cond))
+
+mdl <- aov(bloodpr ~ group, data = C4T1)
+emm <- emmeans(mdl, ~ group)
+```
+
+```{r custom1, exercise=TRUE, exercise.setup="custom-setup"}
+mdl <- aov(bloodpr ~ group, data = C4T1)
+emm <- emmeans(mdl, ~ group)
+emm
+```
+
+###
+
+The groups are listed in the output. By default, R orders factor levels alphabetically, so the order here is: Biofeedback, Combination, Diet, Drug Therapy. **This is the order your coefficients must follow.**
+
+Now let's test the hypothesis that the Combination treatment differs from the average of the other three. The contrast coefficients for this comparison are:
+
+| Group | Biofeedback | Combination | Diet | Drug Therapy |
+|-------|:-----------:|:-----------:|:----:|:------------:|
+| Coefficient | 1/3 | -1 | 1/3 | 1/3 |
+
+These sum to zero (1/3 + (-1) + 1/3 + 1/3 = 0), confirming this is a valid contrast.
+
+```{r custom2, exercise=TRUE, exercise.setup="custom-setup"}
+emm <- emmeans(mdl, ~ group)
+
+# Combination vs. average of all others
+combo_vs_rest <- list("Combo vs Others" = c(1/3, -1, 1/3, 1/3))
+
+contrast(emm, combo_vs_rest)
+```
+
+### Testing Multiple Custom Contrasts
+
+We can test multiple contrasts at once by adding more entries to the list. Let's also test whether Drug Therapies (Drug + Combo) differ from the average of the non-drug treatments (Biofeedback, Diet):
+
+```{r custom3, exercise=TRUE, exercise.setup="custom-setup"}
+emm <- emmeans(mdl, ~ group)
+
+my_contrasts <- list(
+  "Combo vs Others"       = c(1/3, -1, 1/3, 1/3),
+  "Drug vs Non-Drug"      = c(-1/2, 1/2, -1/2, 1/2)
+)
+
+contrast(emm, my_contrasts)
+```
+
+###
+
+You can also apply a p-value adjustment across your custom contrasts:
+
+```{r custom4, exercise=TRUE, exercise.setup="custom-setup"}
+emm <- emmeans(mdl, ~ group)
+
+my_contrasts <- list(
+  "Combo vs Others"       = c(1/3, -1, 1/3, 1/3),
+  "Drug vs Non-Drug"      = c(-1/2, 1/2, -1/2, 1/2)
+)
+
+contrast(emm, my_contrasts, adjust = "bonferroni")
+```
+
+This is helpful in case we have very specific pairwise comparisons, and we don't want the multiple testing penalty of testing **all** pairs. 
+
+### Confidence Intervals for Contrasts
+
+You can obtain confidence intervals for any comparison by wrapping the result in `confint()`:
+
+```{r custom5, exercise=TRUE, exercise.setup="custom-setup"}
+emm <- emmeans(mdl, ~ group)
+
+combo_vs_rest <- list("Combo vs Others" = c(1/3, -1, 1/3, 1/3))
+
+confint(contrast(emm, combo_vs_rest))
+```
+
+### Effect Sizes
+
+The `emmeans` package can also provide standardized effect sizes for contrasts using `eff_size()`. This computes a Cohen's *d*-type measure using the pooled within-group SD:
+
+```{r custom6, exercise=TRUE, exercise.setup="custom-setup"}
+emm <- emmeans(mdl, ~ group)
+
+# Effect sizes for pairwise comparisons
+eff_size(emm, sigma = sigma(mdl), edf = df.residual(mdl))
+```
+
+The `sigma(mdl)` extracts the residual standard deviation (i.e., the square root of $MS_W$), and `df.residual(mdl)` provides the error degrees of freedom.
+
+## Exercise: Custom Contrasts
+
+### Your Turn
+
+Using the `chapter_4_table_1` data (already loaded as `C4T1`), set up and test a custom contrast comparing **Biofeedback vs. Drug Therapy**. Remember, the group order is alphabetical: Biofeedback, Combination, Diet, Drug Therapy.
+
+```{r exercise-contrast, exercise=TRUE, exercise.setup="custom-setup"}
+emm <- emmeans(mdl, ~ group)
+
+# Define the contrast: Biofeedback vs Drug Therapy
+my_contrast <- list(
+  "Bio vs Drug" = c(___, ___, ___, ___)
+)
+
+contrast(emm, my_contrast)
+```
+
+```{r exercise-contrast-hint-1, eval=FALSE}
+# Biofeedback gets +1, Drug Therapy gets -1, others get 0
+my_contrast <- list(
+  "Bio vs Drug" = c(1, 0, 0, -1)
+)
+```
+
+```{r exercise-contrast-solution}
+emm <- emmeans(mdl, ~ group)
+
+my_contrast <- list(
+  "Bio vs Drug" = c(1, 0, 0, -1)
+)
+
+contrast(emm, my_contrast)
+```
+
+###
+
+Now try something more complex. Test whether the average of the two "single-method" treatments (Drug Therapy and Diet) differs from the average of the two "alternative" treatments (Biofeedback and Combination).
+
+```{r exercise-contrast2, exercise=TRUE, exercise.setup="custom-setup"}
+emm <- emmeans(mdl, ~ group)
+
+# Your contrast here
+
+
+```
+
+```{r exercise-contrast2-hint-1, eval=FALSE}
+# Biofeedback = +1/2, Combination = +1/2, Diet = -1/2, Drug Therapy = -1/2
+my_contrast <- list(
+  "Alt vs Traditional" = c(1/2, 1/2, -1/2, -1/2)
+)
+
+contrast(emm, my_contrast)
+```
+
+## Knowledge Check
+
+```{r quiz-final, echo=FALSE}
+quiz(
+  caption = "Test Your Understanding",
+  
+  question("What does the omnibus ANOVA F-test tell us?",
+    answer("Which specific groups differ from each other"),
+    answer("Whether there is any significant difference among the group means", correct = TRUE),
+    answer("The effect size of the treatment"),
+    answer("Whether assumptions are met"),
+    allow_retry = TRUE
+  ),
+  
+  question("In emmeans, what function is used to conduct all pairwise comparisons?",
+    answer("contrast()"),
+    answer("emmeans()"),
+    answer("pairs()", correct = TRUE),
+    answer("pairwise()"),
+    allow_retry = TRUE
+  ),
+  
+  question("What must be true about the coefficients in a contrast vector?",
+    answer("They must all be positive"),
+    answer("They must all be integers"),
+    answer("They must sum to zero", correct = TRUE),
+    answer("They must sum to one"),
+    allow_retry = TRUE
+  ),
+  
+  question("Why is the order of groups in the emmeans output important when specifying custom contrasts?",
+    answer("It determines the p-value"),
+    answer("The contrast coefficients must match the group order so each weight is applied to the correct group mean", correct = TRUE),
+    answer("It affects the degrees of freedom"),
+    answer("The order doesn't matter"),
+    allow_retry = TRUE
+  ),
+  
+  question("What adjustment does pairs() apply by default to control for multiple comparisons?",
+    answer("Bonferroni"),
+    answer("None"),
+    answer("Holm"),
+    answer("Tukey", correct = TRUE),
+    allow_retry = TRUE
+  )
+)
+```
+
+## Summary
+
+### What We Covered
+
+In this tutorial, you learned:
+
+- How to **recode variables** using `case_match()` within `mutate()`
+- The **native pipe** `|>` as an alternative to `%>%` from the tidyverse
+- How to run and interpret a one-way **omnibus ANOVA** with `aov()`
+- How to extract **estimated marginal means** with `emmeans()`
+- How to conduct **pairwise comparisons** with `pairs()` and adjust for multiple testing
+- How to define and test **custom (complex) contrasts** with `contrast()`
+- How to obtain **confidence intervals** and **effect sizes** for comparisons
+
+### The `emmeans` Workflow
+
+The general workflow for follow-up tests is:
+
+1. `mdl <- aov(DV ~ IV, data = mydata)` --- fit the model
+2. `emm <- emmeans(mdl, ~ IV)` --- extract estimated marginal means
+3. `pairs(emm)` --- for pairwise comparisons, **or**
+4. `contrast(emm, my_list)` --- for custom contrasts
+
+We will continue to use `emmeans` in future tutorials as we move to factorial and repeated measures designs.
