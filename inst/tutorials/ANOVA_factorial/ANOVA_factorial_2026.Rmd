@@ -1,0 +1,986 @@
+---
+title: "Factorial ANOVA in R"
+subtitle: "PSYC 50523"
+author: "Justin Luningham"
+tutorial:
+  id: "ANOVA_factorial"
+  name: "Factorial ANOVA"
+output: 
+  learnr::tutorial:
+    progressive: true
+    allow_skip: true
+runtime: shiny_prerendered
+description: "Two-way ANOVA, unbalanced designs, and higher-order factorial ANOVA using aov(), emmeans, and afex"
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+library(knitr)
+library(kableExtra)
+library(dplyr)
+library(AMCP)
+library(emmeans)
+library(afex)
+library(ggplot2)
+options(max.print = 60)
+
+if (requireNamespace("gradethis", quietly = TRUE)) {
+  library(gradethis)
+  gradethis::gradethis_setup()
+}
+
+knitr::opts_chunk$set(echo = TRUE, comment = "", warning = FALSE, message = FALSE)
+```
+
+## Welcome {data-progressive=FALSE}
+
+In this tutorial, we extend our work with ANOVA to **factorial designs** — experiments with two or more independent factors. We will:
+
+- Set up and interpret a **two-way (factorial) ANOVA** using `aov()`
+- Specify **main effects** and **interaction effects** in the model formula
+- Visualize interactions with `interaction.plot()` and `ggplot2`
+- Conduct follow-up tests with `emmeans` for **marginal main effects** (non-significant interaction) and **simple main effects** (significant interaction)
+- Understand why the choice of **sums of squares type** (I, II, or III) matters in **unbalanced designs**, and use the `afex` package to compute Type III SS correctly
+- Extend the framework to **three-way (higher-order) designs**
+
+This tutorial assumes familiarity with one-way ANOVA, `aov()`, and `emmeans`. If any of that is unfamiliar, revisit the earlier tutorials first.
+
+
+**Packages required:** `dplyr`, `AMCP`, `emmeans`, `afex`, `ggplot2`
+
+## A 2×2 Factorial Design
+
+### The C7T1 Data
+
+Table 7.1 in Maxwell et al. (2018) revisits our hypertension data as a **2×2 factorial design**: two levels of Biofeedback (Present / Absent) crossed with two levels of Drug Therapy (Present / Absent). The dataset `C7T1` in the `AMCP` package encodes the four conditions as a single `Group` variable; we will recover the factorial structure by adding explicit factor columns.
+
+```{r c7t1-load, exercise=TRUE}
+library(dplyr)
+library(AMCP)
+
+data("C7T1")
+head(C7T1)
+str(C7T1)
+```
+
+Groups 1 and 2 received Biofeedback; Groups 1 and 3 received Drug Therapy. We recover these factors using `case_match()` inside `mutate()`:
+
+```{r c7t1-prep, exercise=TRUE, exercise.setup="c7t1-load"}
+C7T1 <- C7T1 |>
+  mutate(
+    Biofeedback = factor(case_match(Group,
+      c(1, 2) ~ "Present",
+      c(3, 4) ~ "Absent"
+    )),
+    DrugTherapy = factor(case_match(Group,
+      c(1, 3) ~ "Present",
+      c(2, 4) ~ "Absent"
+    )),
+    Group = factor(Group)
+  )
+
+C7T1
+```
+
+```{r c7t1-setup, echo=FALSE}
+data("C7T1")
+C7T1 <- C7T1 |>
+  mutate(
+    Biofeedback = factor(case_match(Group,
+      c(1, 2) ~ "Present",
+      c(3, 4) ~ "Absent"
+    )),
+    DrugTherapy = factor(case_match(Group,
+      c(1, 3) ~ "Present",
+      c(2, 4) ~ "Absent"
+    )),
+    Group = factor(Group)
+  )
+```
+
+### Cell Means
+
+In a two-way design, it is essential to examine means for each *combination* of factor levels — these are the **cell means**. We use `group_by()` across both factors:
+
+```{r c7t1-means, exercise=TRUE, exercise.setup="c7t1-setup"}
+C7T1 |>
+  group_by(Biofeedback, DrugTherapy) |>
+  summarize(Mean = mean(Score), SD = sd(Score), n = n(), .groups = "drop")
+```
+
+### From One-Way to Factorial
+
+For context, let's first run the data as a one-way, four-group ANOVA:
+
+```{r c7t1-oneway, exercise=TRUE, exercise.setup="c7t1-setup"}
+res_oneway <- aov(Score ~ Group, data = C7T1)
+anova(res_oneway)
+```
+
+The `anova()` table has one row per effect plus a Residuals row. The columns are: `Sum Sq` ($SS$), `Df` ($df$), `Mean Sq` ($MS = SS/df$), `F value` (the $F$-ratio), and `Pr(>F)` (the $p$-value). The Residuals row is the within-cell error: $SS_W$, $df_W$, and $MS_W$.
+
+The $SS_{Between}$ = 1540 and $df_W$ = 16. Now compare to a **main-effects-only** model (no interaction term), using `+` to separate the two factors:
+
+```{r c7t1-maineffects, exercise=TRUE, exercise.setup="c7t1-setup"}
+res_main <- aov(Score ~ Biofeedback + DrugTherapy, data = C7T1)
+anova(res_main)
+```
+
+###
+
+Two things to notice here:
+
+1. The main effect $SS$ values match what we calculated by hand in lecture.
+2. The **residual SS and** $df$ are *larger* in this model: $df_W = 17$ instead of 16, and $SS_W = 1320$ instead of 1000.
+
+The main-effects-only model estimates only three quantities — an overall mean, the Biofeedback effect, and the Drug Therapy effect. It does not account for the specific combination of both treatments together. The variation due to that combination remains in the error. This is precisely why factorial designs that model all combinations are more efficient: they isolate the interaction, which reduces the unexplained error.
+
+### Adding the Interaction Term
+
+The interaction is specified with `*` in the model formula. `A * B` is shorthand for `A + B + A:B`:
+
+```{r c7t1-full, exercise=TRUE, exercise.setup="c7t1-setup"}
+res_full <- aov(Score ~ Biofeedback * DrugTherapy, data = C7T1)
+anova(res_full)
+```
+
+Now $df_W = 16$ and $SS_W = 1000$ — identical to the one-way model. The interaction term absorbs the variation that the main-effects-only model left in the error. The total $SS_{Between}$ (1540) is now partitioned across three effects: Biofeedback, DrugTherapy, and Biofeedback:DrugTherapy.
+
+```{r quiz-formula, echo=FALSE}
+question("In the R formula `Score ~ A * B`, what terms are included in the model?",
+  answer("Main effect of A only"),
+  answer("Main effect of A, main effect of B, and the A×B interaction", correct = TRUE),
+  answer("Only the A×B interaction"),
+  answer("Main effects of A and B, but no interaction"),
+  allow_retry = TRUE
+)
+```
+
+### Visualizing the Interaction
+
+Base R includes `interaction.plot()` for examining factorial effects. The three required arguments are the x-axis factor, the trace (grouping) factor, and the response variable:
+
+```{r c7t1-iplot, exercise=TRUE, exercise.setup="c7t1-setup"}
+interaction.plot(
+  x.factor     = C7T1$DrugTherapy,
+  trace.factor = C7T1$Biofeedback,
+  response     = C7T1$Score,
+  xlab         = "Drug Therapy",
+  ylab         = "Score",
+  trace.label  = "Biofeedback",
+  main         = "Interaction Plot: 2×2 Design (C7T1)"
+)
+```
+
+Parallel lines indicate no interaction. Non-parallel lines suggest that the effect of one factor differs across levels of the other.
+
+## A 3×2 Design
+
+### The C7T5 Data
+
+Now let's consider a **3×2 design**: three levels of Drug Therapy (1, 2, 3) crossed with two levels of Biofeedback (present / absent). These are the data from Table 7.5. Note that in the `C7T5` dataset, the biofeedback variable is named `Feedback` and must be renamed:
+
+```{r c7t5-setup-ex, exercise=TRUE}
+data("C7T5")
+
+C7T5 <- C7T5 |>
+  mutate(
+    Drug        = factor(Drug),
+    Biofeedback = factor(Feedback)
+  )
+
+C7T5 |>
+  group_by(Drug, Biofeedback) |>
+  summarize(Mean = mean(Score), SD = sd(Score), n = n(), .groups = "drop")
+```
+
+```{r c7t5-setup, echo=FALSE}
+data("C7T5")
+C7T5 <- C7T5 |>
+  mutate(Drug = factor(Drug), Biofeedback = factor(Feedback))
+```
+
+### Exercise: Visualize the 3×2 Design
+
+Before running the ANOVA, create an interaction plot for the C7T5 data. Place `Drug` on the x-axis and use `Biofeedback` as the grouping/trace factor.
+
+```{r exercise-c7t5-plot, exercise=TRUE, exercise.setup="c7t5-setup"}
+
+```
+
+```{r exercise-c7t5-plot-hint-1, eval=FALSE}
+interaction.plot(
+  x.factor     = C7T5$Drug,
+  trace.factor = C7T5$Biofeedback,
+  response     = C7T5$Score,
+  xlab         = "Drug",
+  ylab         = "Score",
+  trace.label  = "Biofeedback",
+  main         = "Interaction Plot: 3×2 Design (C7T5)"
+)
+```
+
+### Omnibus ANOVA
+
+The code is identical to the 2×2 case — only the data change:
+
+```{r c7t5-omnibus, exercise=TRUE, exercise.setup="c7t5-setup"}
+res7_5 <- aov(Score ~ Biofeedback * Drug, data = C7T5)
+anova(res7_5)
+```
+
+```{r quiz-c7t5-df, echo=FALSE}
+question_text(
+  "Check the degrees of freedom in the ANOVA table above. For each effect (Biofeedback, Drug, interaction, Residuals), state the value you expected and confirm whether it matches the output. Hint: recall that df = levels - 1 for main effects, and df = df_A × df_B for interactions.",
+  answer(NULL, correct = TRUE),
+  allow_retry = TRUE,
+  try_again_button = "Edit Answer",
+  incorrect = NULL,
+  rows = 5
+)
+```
+
+## Follow-Up: Non-Significant Interaction
+
+### When the Interaction Is Not Significant
+
+For the C7T5 data, the interaction is not significant. Following Maxwell et al. (2018, Ch. 7), when the interaction is non-significant, we interpret the **marginal main effects** — the effect of each factor averaged over the levels of the other factor.
+
+We use `emmeans` for this. An important principle: even though the interaction was not significant, we **keep the full model** (including the interaction term) when conducting follow-up tests. Removing the interaction would inflate the error term and break orthogonality between the main effects.
+
+```{r c7t5-emm-setup, echo=FALSE}
+data("C7T5")
+C7T5 <- C7T5 |>
+  mutate(Drug = factor(Drug), Biofeedback = factor(Feedback))
+res7_5 <- aov(Score ~ Biofeedback * Drug, data = C7T5)
+```
+
+The syntax for marginal pairwise comparisons is the same as in the one-way case — `pairwise ~ Factor`:
+
+```{r c7t5-emm-drug, exercise=TRUE, exercise.setup="c7t5-emm-setup"}
+library(emmeans)
+emm<-emmeans(res7_5, ~ Drug, adjust = "tukey")
+pairs(emm)
+#equivalent: 
+# emmeans(res7_5, pairwise ~ Drug, adjust = "tukey")
+```
+
+The output has two labeled sections. `$emmeans` gives the estimated marginal mean for each Drug level, averaged over Biofeedback — each row shows the mean, SE, $df$, and 95% CI. `$contrasts` gives the pairwise differences — each row shows the estimated difference between two Drug levels, its SE, $df$, $t$-ratio, and Tukey-adjusted $p$-value.
+
+###
+
+For Biofeedback, which has only two levels, there is a single pairwise comparison:
+
+```{r c7t5-emm-bio, exercise=TRUE, exercise.setup="c7t5-emm-setup"}
+emmeans(res7_5, pairwise ~ Biofeedback, adjust = "tukey")
+```
+
+Notice that for a two-level factor, the $t$-statistic from `emmeans` and the $F$-statistic from the omnibus table satisfy $t^2 = F$. They test the same hypothesis.
+
+### A Note on the Error Term
+
+To illustrate why we keep the interaction in the model, compare the results above to refitting without it:
+
+```{r c7t5-no-int, exercise=TRUE, exercise.setup="c7t5-emm-setup"}
+res7_5b <- aov(Score ~ Drug + Biofeedback, data = C7T5)
+anova(res7_5b)
+emmeans(res7_5b, pairwise ~ Drug, adjust = "tukey")
+```
+
+###
+
+The $MS_W$ is larger in the no-interaction model, and the standard errors of all pairwise comparisons increase accordingly. Maxwell et al. (2018) are explicit: **retain the full factorial model structure** for any follow-up tests, both to preserve correct error terms and to avoid post-hoc model revision based on the significance of one effect.
+
+### Visualizing Marginal Means
+
+```{r c7t5-plot-emm, exercise=TRUE, exercise.setup="c7t5-emm-setup"}
+plot(emmeans(res7_5, ~Drug),
+     main = "Marginal Means: Drug (averaged over Biofeedback)")
+
+plot(emmeans(res7_5, ~Biofeedback),
+     main = "Marginal Means: Biofeedback (averaged over Drug)")
+```
+
+### Exercise: Interpretation
+
+```{r quiz-c7t5-interp, echo=FALSE}
+question_text(
+  "Based on the emmeans output for Drug, which pairs of drug treatments show a significant difference at alpha = .05 (Tukey-adjusted)? How should you report this in the context of the full factorial analysis?",
+  answer(NULL, correct = TRUE),
+  allow_retry = TRUE,
+  try_again_button = "Edit Answer",
+  incorrect = NULL,
+  rows = 5
+)
+```
+
+## Follow-Up: Significant Interaction
+
+### The C7T9 Data
+
+Now suppose the study included 6 participants per cell instead of 5. These data are in Table 7.9 (`C7T9`). With the additional observations, the interaction becomes statistically significant.
+
+```{r c7t9-setup-ex, exercise=TRUE}
+data("C7T9")
+
+C7T9 <- C7T9 |>
+  mutate(
+    Biofeedback = factor(Feedback),
+    Drug        = factor(Drug)
+  )
+
+C7T9 |>
+  group_by(Biofeedback, Drug) |>
+  summarize(Mean = mean(Score), SD = sd(Score), n = n(), .groups = "drop")
+```
+
+```{r c7t9-omnibus, exercise=TRUE, exercise.setup="c7t9-setup"}
+res7_9 <- aov(Score ~ Biofeedback * Drug, data = C7T9)
+anova(res7_9)
+```
+
+```{r c7t9-setup, echo=FALSE}
+data("C7T9")
+C7T9 <- C7T9 |>
+  mutate(Biofeedback = factor(Feedback), Drug = factor(Drug))
+res7_9 <- aov(Score ~ Biofeedback * Drug, data = C7T9)
+```
+
+### When the Interaction Is Significant
+
+A significant interaction means the effect of one factor **depends on the level of the other**. Interpreting main effects in isolation would be misleading. The appropriate follow-up is to examine **simple main effects**: the effect of one factor at each fixed level of the other factor.
+
+In `emmeans`, the conditioning symbol `|` means "given" or "at fixed levels of." The formula `pairwise ~ Drug | Biofeedback` requests Drug comparisons computed separately within each level of Biofeedback:
+
+```{r c7t9-simple1, exercise=TRUE, exercise.setup="c7t9-setup"}
+emmeans(res7_9, pairwise ~ Drug | Biofeedback, adjust = "tukey")
+#equivalent (without the descriptive statistics):
+#emm<-emmeans(res7_9, ~ Drug | Biofeedback, adjust = "tukey")
+#pairs(emm)
+```
+
+The output is organized by level of the conditioning variable. Each panel (one per Biofeedback level) contains an `$emmeans` section with Drug means *at that level of Biofeedback*, and a `$contrasts` section with pairwise Drug comparisons *within that level*. The error term for all panels comes from the full model's $MS_W$.
+
+###
+
+We can also look at simple effects from the other direction — Biofeedback within each Drug level:
+
+```{r c7t9-simple2, exercise=TRUE, exercise.setup="c7t9-setup"}
+emmeans(res7_9, pairwise ~ Biofeedback | Drug, adjust = "tukey")
+```
+
+### Interaction Plot
+
+```{r c7t9-iplot, exercise=TRUE, exercise.setup="c7t9-setup"}
+interaction.plot(
+  x.factor     = C7T9$Drug,
+  trace.factor = C7T9$Biofeedback,
+  response     = C7T9$Score,
+  xlab         = "Drug",
+  ylab         = "Score",
+  trace.label  = "Biofeedback",
+  main         = "Interaction: C7T9"
+)
+```
+
+```{r quiz-c7t9-interp, echo=FALSE}
+question_text(
+  "Based on the simple effects output and the interaction plot, describe the nature of the significant interaction. Which drug appears most effective in the presence of biofeedback? Does that ranking change in the absence of biofeedback?",
+  answer(NULL, correct = TRUE),
+  allow_retry = TRUE,
+  try_again_button = "Edit Answer",
+  incorrect = NULL,
+  rows = 5
+)
+```
+
+### Exercise: Changing the Adjustment Method
+
+Using the C7T9 data (model already fit as `res7_9`), compute simple effects of Drug within levels of Biofeedback using a **Bonferroni** correction.
+
+```{r exercise-simple, exercise=TRUE, exercise.setup="c7t9-setup"}
+emmeans(res7_9, pairwise ~ ___ | ___, adjust = "___")
+```
+
+```{r exercise-simple-hint-1, eval=FALSE}
+emmeans(res7_9, pairwise ~ Drug | Biofeedback, adjust = "bonferroni")
+```
+
+```{r exercise-simple-solution}
+emmeans(res7_9, pairwise ~ Drug | Biofeedback, adjust = "bonferroni")
+```
+
+
+## Unbalanced Designs and Sums of Squares
+
+### Why Balance Matters
+
+In a **balanced** design (equal cell sizes), the main effects and interaction are **orthogonal** — they partition the total $SS$ into non-overlapping parts, and the order in which effects enter the model does not affect their $SS$.
+
+In an **unbalanced** design, this orthogonality breaks down. The effects overlap, and how you partition the shared variance becomes a consequential choice. There are three standard approaches:
+
+- **Type I (Sequential):** Each effect is tested after accounting for all effects entered before it in the formula. The researcher's entry order — not the theoretical structure — determines the SS for each main effect. Generally *not* recommended for unbalanced factorial designs.
+
+- **Type II:** Tests each main effect accounting for the other main effect, but *ignoring* the interaction. Appropriate only when there is strong a priori evidence that the population interaction is zero (Maxwell et al., 2018, p. 320).
+
+- **Type III (Partial):** Tests each effect after accounting for *all other effects*, including the interaction. This is the default recommendation from Maxwell et al. for unbalanced factorial designs.
+
+Critically: the interaction $SS$ is the same under all three types. The choice only affects the main effect $SS$.
+
+### A Demonstration of Type I Order-Dependence
+
+The `C7T23` dataset from Table 7.23 presents a $3 \times 3$ unbalanced design: three levels of Therapy (CBT, Rogerian, Dialectical) crossed with three levels of depression Severity (Mild, Moderate, Severe). Cell sizes are unequal.
+
+```{r c7t23-setup-ex, exercise=TRUE}
+data("C7T23", package = "AMCP")
+head(C7T23)
+str(C7T23)
+```
+
+```{r c7t23-prep, exercise=TRUE, exercise.setup="c7t23-setup-ex"}
+C7T23 <- C7T23 |>
+  mutate(
+    Therapy  = factor(Therapy),
+    Severity = factor(Severity)
+  )
+
+C7T23 |>
+  group_by(Therapy, Severity) |>
+  summarize(Mean = mean(Score), SD = sd(Score), n = n(), .groups = "drop")
+```
+
+```{r c7t23-setup, echo=FALSE}
+data("C7T23", package = "AMCP")
+C7T23 <- C7T23 |>
+  mutate(
+    Therapy  = factor(Therapy),
+    Severity = factor(Severity),
+    id       = 1:nrow(C7T23)
+  )
+```
+
+Now watch what happens when we simply reverse the order of factors in the `aov()` formula:
+
+```{r c7t23-type1, exercise=TRUE, exercise.setup="c7t23-setup"}
+# Therapy entered first (Type I SS)
+anova(aov(Score ~ Therapy * Severity, data = C7T23))
+
+# Severity entered first (Type I SS — same data, different SS)
+anova(aov(Score ~ Severity * Therapy, data = C7T23))
+```
+
+###
+
+The main effect $SS$ values for Therapy and Severity change depending on which factor is listed first. The interaction $SS$ is unchanged. This is the defining problem with Type I SS in unbalanced designs: results depend on an arbitrary ordering decision, not on the data or theory.
+
+### Visualizing the C7T23 Data
+
+```{r c7t23-viz, exercise=TRUE, exercise.setup="c7t23-setup"}
+library(ggplot2)
+
+ggplot(C7T23, aes(x = Therapy, y = Score, color = Severity, group = Severity)) +
+  stat_summary(fun = mean, geom = "line", linewidth = 1) +
+  stat_summary(fun = mean, geom = "point", size = 3) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", width = 0.15) +
+  labs(
+    title = "Interaction Plot: Therapy × Severity",
+    y = "Depression Score (MMPI)"
+  ) +
+  theme_minimal()
+```
+
+### Using `afex` for Type III SS
+
+The `afex` package (**A**nalysis of **F**actorial **Ex**periments) provides a principled interface for factorial ANOVA that defaults to **Type III sums of squares** and automatically sets effect coding (sum-to-zero contrasts). This makes it the recommended tool for unbalanced factorial designs.
+
+The main function is `aov_ez()`. Its key arguments:
+- `id`: character string naming the subject/participant ID variable
+- `dv`: character string naming the dependent variable
+- `data`: your data frame
+- `between`: character vector of between-subjects factor names
+
+We need to add a participant ID variable first (one row = one participant):
+
+```{r c7t23-afex-setup, echo=FALSE}
+data("C7T23", package = "AMCP")
+C7T23 <- C7T23 |>
+  mutate(
+    Therapy  = factor(Therapy),
+    Severity = factor(Severity),
+    id       = 1:nrow(C7T23)
+  )
+library(afex)
+fit_afex <- aov_ez(
+  id      = "id",
+  dv      = "Score",
+  data    = C7T23,
+  between = c("Therapy", "Severity")
+)
+```
+
+```{r c7t23-afex, exercise=TRUE, exercise.setup="c7t23-setup"}
+library(afex)
+
+fit_afex <- aov_ez(
+  id      = "id",
+  dv      = "Score",
+  data    = C7T23,
+  between = c("Therapy", "Severity")
+)
+
+fit_afex
+```
+
+###
+
+The default `afex` print shows one row per effect. The columns are: `df` (numerator $df$), `MSE` (the denominator mean square, i.e. $MS_W$), `F` (the $F$-ratio), `ges` (generalized $\eta^2$, an effect size for factorial designs), and `Pr(>F)` (the $p$-value). Unlike the base `anova()` output, SS and $df_W$ are not shown directly, but $SS_{Effect} = F \times MSE \times df_{Effect}$, and $df_W$ can be back-calculated from $MS_W$ and $SS_W$ if needed. Crucially, the main effect values here are **stable across factor ordering** because they reflect Type III SS.
+
+To see the underlying SS directly, access the `$Anova` component, which stores the full Type III table:
+
+```{r c7t23-Anova, exercise=TRUE, exercise.setup="c7t23-afex-setup"}
+fit_afex$Anova
+```
+
+This table adds `Sum Sq` and shows the Intercept row (the SS explained by the grand mean being nonzero — **not part of the factorial partition**). For the effects you care about, `Sum Sq / Df` recovers $MS_{Effect}$, and `Sum Sq` can be compared directly to the partitioned total.
+
+You can also retrieve a nicely formatted table with `nice()`:
+
+```{r c7t23-nice, exercise=TRUE, exercise.setup="c7t23-afex-setup"}
+nice(fit_afex)
+```
+
+`nice()` reformats the same table with cleaner column labels, rounds to a readable number of decimal places, and adds a significance-stars column. The numbers are identical to the default print; `ges` is still generalized $\eta^2$. Use it when you want a table that is easier to transcribe or share.
+
+### Type II vs Type III Examples 
+
+To change the type of sums of squares, we use the `type` argument in `aov_ez()`:
+
+```{r c7t23-type2, exercise=TRUE, exercise.setup="c7t23-afex-setup"}
+# Type II
+fit_II <- aov_ez(
+  id      = "id",
+  dv      = "Score",
+  data    = C7T23,
+  between = c("Therapy", "Severity"),
+  type    = 2
+)
+fit_II$Anova
+
+# Type III (explicit, same as default)
+fit_III <- aov_ez(
+  id      = "id",
+  dv      = "Score",
+  data    = C7T23,
+  between = c("Therapy", "Severity"),
+  type    = 3
+)
+fit_III$Anova
+```
+
+The numbers change slightly, but the conclusions are consistent. 
+
+**To reiterate**: Type III is recommended by Maxwell et al. in nearly all applied situations. Anytime we are considering the interaction in our factorial analysis, we should use Type III. Type III tests each main effect after accounting for all other effects including the interaction, which is the correct question to ask when the interaction is in the model.
+
+Type II is appropriate only under one narrow condition: when you have strong, *a priori* theoretical grounds to conclude the population interaction is exactly zero. In that case, pooling the interaction SS into the error for the main effect tests gives you more power. Maxwell et al. are fairly cautious about recommending this in practice.
+
+### Follow-Up with `emmeans`
+
+`afex_aov` objects are fully compatible with `emmeans`. The follow-up strategy is identical to what we used with `aov()`:
+
+```{r c7t23-emm, exercise=TRUE, exercise.setup="c7t23-afex-setup"}
+library(emmeans)
+
+# Marginal pairwise comparisons for Therapy
+emmeans(fit_afex, pairwise ~ Therapy, adjust = "tukey")
+```
+
+```{r c7t23-emm2, exercise=TRUE, exercise.setup="c7t23-afex-setup"}
+# Marginal pairwise comparisons for Severity
+emmeans(fit_afex, pairwise ~ Severity, adjust = "tukey")
+```
+
+If the interaction were significant, you would use `pairwise ~ Therapy | Severity` to obtain simple main effects — the same syntax as with `aov()`.
+
+### Exercise: Comparing SS Types
+
+```{r quiz-ss-type, echo=FALSE}
+quiz(
+  caption = "Sums of Squares",
+
+  question("In an unbalanced factorial design, which type of SS does base R's `anova()` compute?",
+    answer("Type II"),
+    answer("Type III"),
+    answer("Type I", correct = TRUE),
+    answer("It depends on the model specification"),
+    allow_retry = TRUE
+  ),
+
+  question("According to Maxwell et al. (2018), which type of SS is generally recommended for unbalanced factorial designs that include an interaction term?",
+    answer("Type I"),
+    answer("Type II"),
+    answer("Type III", correct = TRUE),
+    answer("All types give the same result in unbalanced designs"),
+    allow_retry = TRUE
+  ),
+
+  question("Why must you provide an `id` variable when using `afex::aov_ez()`?",
+    answer("To sort the data before analysis"),
+    answer("To identify which observations belong to the same participant, which is required for the ANOVA error structure", correct = TRUE),
+    answer("To set the random seed"),
+    answer("`aov_ez()` does not require an `id` variable"),
+    allow_retry = TRUE
+  ),
+
+  question("In a balanced factorial design, how do Type I, II, and III SS compare?",
+    answer("Type III is always largest"),
+    answer("They are all equal to one another", correct = TRUE),
+    answer("Type I and II are equal, but Type III differs"),
+    answer("Type II and III are equal, but Type I differs"),
+    allow_retry = TRUE
+  )
+)
+```
+
+## Higher-Order Factorial ANOVA
+
+### Three-Way Designs
+
+Higher-order factorial designs generalize the two-way ANOVA to three or more factors. A **three-way design** with factors A, B, and C produces **seven testable effects**:
+
+- Three main effects: A, B, C
+- Three two-way interactions: A×B, A×C, B×C
+- One three-way interaction: A×B×C
+
+**Advantages** over two-way designs:
+- Greater efficiency — every observation contributes information on more effects
+- Higher-order interactions become testable, which is not possible with separate two-way analyses
+
+**Disadvantages:**
+- Interpretation becomes substantially more complex when higher-order interactions are significant
+- Interactions consume degrees of freedom that may reduce power for effects of primary interest
+
+### Interpretation Strategy
+
+Maxwell et al. (2018, Ch. 8, Figure 8.6) recommend a **top-down strategy**, beginning with the highest-order term and working down:
+
+1. **Test the three-way interaction (A×B×C).** If significant:
+   - Examine two-way interactions at each level of the third factor (e.g., A×B at each level of C)
+   - For any significant two-way interaction at a given level of C, apply the simple effects strategy from Ch. 7
+   - For non-significant two-way interactions at a given level of C, interpret the relevant marginal main effects within that level
+2. **If the three-way interaction is not significant:**
+   - Test and interpret the two-way interactions (A×B, A×C, B×C) as in the two-way case
+   - For non-significant two-way interactions, interpret marginal main effects
+
+### The C8T12 Data
+
+Data from Table 8.12 extend our biofeedback/drug study with an additional diet condition, producing a **3 (Drug: X, Y, Z) × 2 (Biofeedback: Absent, Present) × 2 (Diet: No, Yes)** design. The dependent variable is systolic blood pressure (`BP`).
+
+```{r c8t12-setup-ex, exercise=TRUE}
+data("C8T12")
+head(C8T12)
+str(C8T12)
+```
+
+We recode the numeric condition codes using `case_match()`:
+
+```{r c8t12-prep, exercise=TRUE, exercise.setup="c8t12-setup-ex"}
+C8T12 <- C8T12 |>
+  mutate(
+    Diet        = factor(case_match(Diet, 1 ~ "No", 2 ~ "Yes")),
+    Drug        = factor(case_match(Drug, 1 ~ "X", 2 ~ "Y", 3 ~ "Z")),
+    Biofeedback = factor(case_match(Biofeedback, 1 ~ "Absent", 2 ~ "Present"))
+  )
+
+C8T12 |>
+  group_by(Diet, Drug, Biofeedback) |>
+  summarize(Mean = mean(BP), SD = sd(BP), n = n(), .groups = "drop")
+```
+
+```{r c8t12-setup, echo=FALSE}
+data("C8T12")
+C8T12 <- C8T12 |>
+  mutate(
+    Diet        = factor(case_match(Diet, 1 ~ "No", 2 ~ "Yes")),
+    Drug        = factor(case_match(Drug, 1 ~ "X", 2 ~ "Y", 3 ~ "Z")),
+    Biofeedback = factor(case_match(Biofeedback, 1 ~ "Absent", 2 ~ "Present"))
+  )
+ANOVA.3Way <- aov(BP ~ Biofeedback * Drug * Diet, data = C8T12)
+```
+
+### Omnibus Three-Way ANOVA
+
+This is a balanced design (equal cell sizes), so Type I = Type III and we can use `aov()` directly. The formula simply extends the `*` notation to three factors:
+
+```{r c8t12-omnibus, exercise=TRUE, exercise.setup="c8t12-setup"}
+ANOVA.3Way <- aov(BP ~ Biofeedback * Drug * Diet, data = C8T12)
+anova(ANOVA.3Way)
+summary(ANOVA.3Way)
+```
+
+###
+
+The three-way interaction (Biofeedback:Drug:Diet) is significant. Following Figure 8.6, we now decompose it by examining two-way interactions within each level of Diet.
+
+```{r quiz-c8t12-df, echo=FALSE}
+question_text(
+  "Before looking at the follow-up tests, write out the degrees of freedom you expect for each effect in the omnibus table: Biofeedback, Drug, Diet, Biofeedback×Drug, Biofeedback×Diet, Drug×Diet, and Biofeedback×Drug×Diet. Confirm each against the output.",
+  answer(NULL, correct = TRUE),
+  allow_retry = TRUE,
+  try_again_button = "Edit Answer",
+  incorrect = NULL,
+  rows = 5
+)
+```
+
+### Two-Way Interactions Within Levels of Diet
+
+The `emmeans` function `joint_tests()` performs omnibus $F$-tests for lower-order effects within levels of a conditioning factor, using the **pooled error term** from the full model. This is preferable to splitting the data and re-fitting separate models, which would use a local $MS_W$ instead of the full-model estimate:
+
+```{r c8t12-joint, exercise=TRUE, exercise.setup="c8t12-setup"}
+library(emmeans)
+
+joint_tests(ANOVA.3Way, by = "Diet")
+```
+
+The output contains one mini-ANOVA table per level of Diet. Each table tests all lower-order effects (Biofeedback, Drug, and Biofeedback × Drug) *within that level of Diet*, using the pooled $MS_W$ from the full three-way model. The columns are `df1` (effect $df$), `df2` ($df_W$ from the full model), `F.ratio`, and `p.value`.
+
+###
+
+The output gives us two separate ANOVA tables — one for `Diet = No` and one for `Diet = Yes`.
+
+- **Within Diet = Yes:** The Biofeedback × Drug interaction is *not* significant. We follow the non-significant interaction path from the flowchart: interpret marginal main effects within this Diet level.
+- **Within Diet = No:** The Biofeedback × Drug interaction *is* significant. We follow the significant interaction path: examine simple main effects.
+
+### Follow-Up Within Diet = Yes (No Interaction)
+
+For the `Diet = Yes` group, we examine marginal effects of Biofeedback and Drug, averaged over the other factor. The `| Diet` conditioning restricts the output to within-level estimates, but the error term still comes from the full model:
+
+```{r c8t12-followup-bio, exercise=TRUE, exercise.setup="c8t12-setup"}
+# Biofeedback effect within each Diet level, averaging over Drug
+emmeans(ANOVA.3Way, pairwise ~ Biofeedback | Diet, adjust = "tukey")
+```
+
+```{r c8t12-followup-drug, exercise=TRUE, exercise.setup="c8t12-setup"}
+# Drug effect within each Diet level, averaging over Biofeedback
+emmeans(ANOVA.3Way, pairwise ~ Drug | Diet, adjust = "tukey")
+```
+
+###
+
+We interpret the `Diet = Yes` rows from each output. These are the marginal comparisons for the group with no significant two-way interaction.
+
+### Follow-Up Within Diet = No (Significant Interaction)
+
+For the `Diet = No` group, we examine simple effects: the effect of Drug within each level of Biofeedback (and vice versa). The `| Biofeedback * Diet` conditioning provides comparisons within every combination of Biofeedback and Diet:
+
+```{r c8t12-simple-bio, exercise=TRUE, exercise.setup="c8t12-setup"}
+# Simple effects of Biofeedback within Drug×Diet combinations
+emmeans(ANOVA.3Way, pairwise ~ Biofeedback | Drug * Diet, adjust = "tukey")
+```
+
+```{r c8t12-simple-drug, exercise=TRUE, exercise.setup="c8t12-setup"}
+# Simple effects of Drug within Biofeedback×Diet combinations
+emmeans(ANOVA.3Way, pairwise ~ Drug | Biofeedback * Diet, adjust = "tukey")
+```
+
+###
+
+Again, we focus our interpretation on the `Diet = No` rows, where the two-way interaction was significant. The `Diet = Yes` output is also produced (the `emmeans` conditioning provides all combinations), but per the flowchart those cells follow the marginal main effects path already examined above.
+
+### Visualizing the Three-Way Interaction
+
+Three-way interactions require **paneled interaction plots** — one panel per level of the third factor. If the two-way interaction pattern (shape) differs across panels, there is evidence of a three-way interaction.
+
+```{r c8t12-viz, exercise=TRUE, exercise.setup="c8t12-setup"}
+library(ggplot2)
+
+cell_means <- C8T12 |>
+  group_by(Diet, Drug, Biofeedback) |>
+  summarize(Mean = mean(BP), SE = sd(BP) / sqrt(n()), .groups = "drop")
+
+ggplot(cell_means, aes(x = Drug, y = Mean, color = Biofeedback, group = Biofeedback)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = Mean - SE, ymax = Mean + SE), width = 0.15) +
+  facet_wrap(~ Diet, labeller = label_both) +
+  labs(
+    title = "Three-Way Interaction: Drug × Biofeedback × Diet",
+    y = "Mean Blood Pressure",
+    x = "Drug"
+  ) +
+  theme_minimal()
+```
+
+### 
+
+### Alternative: `afex_plot()`
+
+The `afex` package includes `afex_plot()`, which handles paneled interaction plots directly — no manual subsetting required. It takes the fitted model as its first argument, and the `panel` argument specifies which factor defines the panels:
+```{r c8t12-afex-plot, exercise=TRUE, exercise.setup="c8t12-setup"}
+library(afex)
+
+afex_plot(ANOVA.3Way,
+          x       = "Drug",
+          trace   = "Biofeedback",
+          panel   = "Diet",
+          mapping = c("color", "linetype")) +
+  labs(
+    title = "Three-Way Interaction: Drug × Biofeedback × Diet",
+    y     = "Mean Blood Pressure",
+    x     = "Drug"
+  ) +
+  theme_minimal()
+```
+
+The error bars show model-based standard errors by default. Because `afex_plot()` returns a `ggplot2` object, any `ggplot2` layer can be added with `+` as usual.
+
+###
+
+For comparison, here is the same plot using base R's `interaction.plot()`. Paneling requires manually subsetting the data and using `par(mfrow = ...)` to arrange multiple plots side by side:
+```{r c8t12-base-plot, exercise=TRUE, exercise.setup="c8t12-setup"}
+par(mfrow = c(1, 2))
+
+interaction.plot(
+  x.factor     = C8T12$Drug[C8T12$Diet == "No"],
+  trace.factor = C8T12$Biofeedback[C8T12$Diet == "No"],
+  response     = C8T12$BP[C8T12$Diet == "No"],
+  xlab = "Drug", ylab = "BP", trace.label = "Biofeedback",
+  main = "Diet = No"
+)
+
+interaction.plot(
+  x.factor     = C8T12$Drug[C8T12$Diet == "Yes"],
+  trace.factor = C8T12$Biofeedback[C8T12$Diet == "Yes"],
+  response     = C8T12$BP[C8T12$Diet == "Yes"],
+  xlab = "Drug", ylab = "BP", trace.label = "Biofeedback",
+  main = "Diet = Yes"
+)
+
+par(mfrow = c(1, 1))
+```
+
+The two approaches produce the same information. `afex_plot()` is generally preferred when you have three or more factors, since subsetting and resetting `par()` becomes unwieldy as the number of panels grows.
+
+```{r quiz-threeway, echo=FALSE}
+question_text(
+  "Examine the two panels in the interaction plot. Describe how the Drug × Biofeedback pattern differs between the Diet = No and Diet = Yes conditions. How does this visual pattern correspond to the significant three-way interaction you found in the omnibus test?",
+  answer(NULL, correct = TRUE),
+  allow_retry = TRUE,
+  try_again_button = "Edit Answer",
+  incorrect = NULL,
+  rows = 5
+)
+```
+
+### Exercise: Three-Way Design
+
+Using the `ANOVA.3Way` model (already fit), obtain pairwise comparisons of Drug within each Biofeedback level, separately for each Diet condition. Use Tukey adjustment.
+
+```{r exercise-threeway, exercise=TRUE, exercise.setup="c8t12-setup"}
+# Complete the emmeans call
+emmeans(ANOVA.3Way, pairwise ~ ___ | ___ * ___, adjust = "tukey")
+```
+
+```{r exercise-threeway-hint-1, eval=FALSE}
+# Drug comparisons within Biofeedback and Diet levels
+emmeans(ANOVA.3Way, pairwise ~ Drug | Biofeedback * Diet, adjust = "tukey")
+```
+
+```{r exercise-threeway-solution}
+emmeans(ANOVA.3Way, pairwise ~ Drug | Biofeedback * Diet, adjust = "tukey")
+```
+
+## Knowledge Check
+
+```{r quiz-final, echo=FALSE}
+quiz(
+  caption = "Test Your Understanding",
+
+  question("In a balanced factorial design, what is the difference between `aov(Y ~ A + B)` and `aov(Y ~ A * B)`?",
+    answer("`A + B` includes the interaction; `A * B` does not"),
+    answer("`A * B` includes main effects and the A×B interaction; `A + B` includes only main effects", correct = TRUE),
+    answer("They are equivalent for all purposes"),
+    answer("`A * B` removes the error term"),
+    allow_retry = TRUE
+  ),
+
+  question("When a two-way interaction is significant, what is the recommended follow-up approach?",
+    answer("Report only the main effects and ignore the interaction"),
+    answer("Test simple main effects — the effect of one factor at each fixed level of the other", correct = TRUE),
+    answer("Refit the model without the interaction term"),
+    answer("Report pairwise comparisons averaging over both factors"),
+    allow_retry = TRUE
+  ),
+
+  question("Maxwell et al. (2018) recommend keeping the interaction term in the model even when it is not significant. Why?",
+    answer("To increase the residual degrees of freedom"),
+    answer("To preserve orthogonality of main effects and maintain the originally planned model structure", correct = TRUE),
+    answer("To reduce the residual SS"),
+    answer("Because removing it inflates Type I error for main effects"),
+    allow_retry = TRUE
+  ),
+
+  question("In an unbalanced design, which type of SS changes when you reorder factors in `aov()`?",
+    answer("Type III"),
+    answer("Type II"),
+    answer("Type I", correct = TRUE),
+    answer("The interaction SS"),
+    allow_retry = TRUE
+  ),
+
+  question("What does the `|` symbol mean in an `emmeans` formula such as `pairwise ~ Drug | Biofeedback`?",
+    answer("Or — test Drug or Biofeedback comparisons"),
+    answer("Conditioning — compute Drug comparisons at each fixed level of Biofeedback", correct = TRUE),
+    answer("Division — divide the Drug effect by the Biofeedback effect"),
+    answer("Interaction — test the Drug × Biofeedback interaction"),
+    allow_retry = TRUE
+  ),
+
+  question("Which `emmeans` function tests omnibus effects for lower-order terms within levels of a conditioning factor, using the pooled (full-model) error term?",
+    answer("simple_effects()"),
+    answer("emmeans()"),
+    answer("joint_tests()", correct = TRUE),
+    answer("pairs()"),
+    allow_retry = TRUE
+  ),
+
+  question("In a three-way ANOVA, what is the correct first step according to the Maxwell et al. (2018) interpretation flowchart?",
+    answer("Test all two-way interactions simultaneously"),
+    answer("Examine all pairwise comparisons of cell means"),
+    answer("Test the three-way interaction first, then work downward", correct = TRUE),
+    answer("Test main effects first, then examine interactions"),
+    allow_retry = TRUE
+  )
+)
+```
+
+## Summary
+
+### What We Covered
+
+In this tutorial, you learned:
+
+- How to set up a **two-way factorial ANOVA** using `aov()` with the `*` operator to include the interaction
+- Why **including the interaction term** matters for the error term, even when the interaction is not significant
+- How to create **interaction plots** with `interaction.plot()` and `ggplot2` with `facet_wrap()`
+- Follow-up strategies using `emmeans`:
+  - **Non-significant interaction:** marginal main effects with `pairwise ~ A` and `pairwise ~ B`
+  - **Significant interaction:** simple main effects with `pairwise ~ A | B`
+- Why **Type I SS is order-dependent** in unbalanced designs and therefore generally inappropriate
+- How to use `afex::aov_ez()` to obtain **Type III SS** correctly for unbalanced designs, consistent with Maxwell et al. (2018) recommendations
+- How to extend this framework to **three-way designs**, using `joint_tests(by = "C")` to decompose higher-order interactions within levels of a third factor
+
+### Key Functions
+
+| Task | Function |
+|------|----------|
+| Factorial ANOVA (balanced) | `aov(Y ~ A * B, data = ...)` |
+| Factorial ANOVA (unbalanced, Type III) | `afex::aov_ez("id", "Y", data, between = c("A", "B"))` |
+| Formatted `afex` table | `nice(fit)` |
+| Interaction plot (base R) | `interaction.plot(x.factor, trace.factor, response)` |
+| Marginal means | `emmeans(fit, ~ A)` |
+| Pairwise comparisons (marginal) | `emmeans(fit, pairwise ~ A, adjust = "tukey")` |
+| Simple main effects | `emmeans(fit, pairwise ~ A \| B, adjust = "tukey")` |
+| Omnibus tests within levels | `joint_tests(fit, by = "C")` |
+
+We will continue building on this framework in upcoming tutorials on repeated measures and mixed designs.
