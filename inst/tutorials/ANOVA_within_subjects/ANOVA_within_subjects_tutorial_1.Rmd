@@ -1,0 +1,714 @@
+---
+title: "Within-Subjects ANOVA"
+subtitle: "PSYC 50523"
+author: "Justin Luningham"
+tutorial:
+  id: "ANOVA_within_subjects"
+  name: "Within-Subjects ANOVA"
+output: 
+  learnr::tutorial:
+    progressive: true
+    allow_skip: true
+runtime: shiny_prerendered
+description: "One-way within-subjects ANOVA, sphericity corrections, follow-up tests, two within-subjects factors, and split-plot designs using afex and emmeans"
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+library(tidyr)
+library(dplyr)
+library(afex)
+library(emmeans)
+library(ggplot2)
+library(AMCP)
+
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+
+# ---- Pre-build datasets used across sections ----
+
+# Section 1-2: Anxiety treatment study (simulated)
+set.seed(50523)
+n <- 16
+subj_re <- rnorm(n, 0, 6)
+anxiety <- data.frame(
+  ID = factor(rep(1:n, each = 3)),
+  Time = factor(rep(c("Pre", "Week4", "Week8"), times = n),
+                levels = c("Pre", "Week4", "Week8")),
+  Anxiety = round(
+    rep(c(32, 26, 22), times = n) +
+    rep(subj_re, each = 3) +
+    rnorm(n * 3, 0, 3), 1
+  )
+)
+
+anxiety_wide <- anxiety |>
+  pivot_wider(names_from = Time, values_from = Anxiety)
+
+# Section 3: Two within-subjects factors (letter perception, Ch 12)
+C12T1_work <- C12T1 |>
+  mutate(ID = factor(row_number()))
+
+C12T1_long <- C12T1_work |>
+  pivot_longer(
+    cols = -ID,
+    names_to = "Noise.Angle",
+    values_to = "RT"
+  ) |>
+  separate(col = Noise.Angle, into = c("Noise", "Angle"), sep = -1) |>
+  mutate(Noise = factor(Noise), Angle = factor(Angle))
+
+two_within_res <- aov_ez(
+  id = "ID", dv = "RT",
+  within = c("Noise", "Angle"),
+  data = C12T1_long
+)
+
+# Section 4: Split-plot design (Ch 12)
+C12T7_work <- C12T7 |> mutate(Age = "Young")
+C12T15_work <- C12T15 |> mutate(Age = "Old")
+
+SplitPlot <- bind_rows(C12T7_work, C12T15_work) |>
+  mutate(ID = factor(row_number())) |>
+  pivot_longer(
+    cols = -c(ID, Age),
+    names_to = "Angle",
+    values_to = "RT"
+  ) |>
+  mutate(Age = factor(Age), Angle = factor(Angle))
+
+split_res <- aov_ez(
+  id = "ID", dv = "RT",
+  between = "Age", within = "Angle",
+  data = SplitPlot
+)
+```
+
+
+## Welcome
+
+This tutorial covers within-subjects ANOVA — from the basics through more complex designs you'll encounter in applied research. By the end, you will be able to:
+
+- Run and interpret a one-way within-subjects ANOVA with `aov_ez()`
+- Evaluate sphericity and apply appropriate corrections
+- Conduct follow-up tests with `emmeans`
+- Extend the approach to designs with **two within-subjects factors**
+- Analyze **split-plot designs** (one between, one within factor)
+
+**Sections 1–2** review and practice what we covered in class. **Sections 3–4** introduce new material that we'll build on next week.
+
+Estimated time: ~60 minutes.
+
+
+## Section 1: One-Way Within-Subjects ANOVA
+
+### Quick recap from class
+
+Within-subjects designs measure the same people under multiple conditions. The mixed-model ANOVA treats Subject as a random factor and tests the fixed effect of condition against the Subject × Condition interaction ($MS_{A \times S}$).
+
+###
+
+A critical new assumption comes with this approach: **sphericity** — the requirement that the variances of all pairwise difference scores are equal. In practice, this assumption is almost always violated. For example, in a longitudinal study, adjacent time points tend to be more strongly correlated than distant ones, which means the variances of the pairwise differences won't be constant.
+
+###
+
+When sphericity is violated, the standard $F$-test has inflated Type I error. The fix is an **epsilon ($\varepsilon$) correction** that shrinks the degrees of freedom, making the critical value more conservative. The observed $F$-statistic itself doesn't change — only the $df$ used to evaluate it.
+
+###
+
+Three corrections are available:
+
+| Correction | Properties |
+|:--|:--|
+| **Lower-Bound** ($\varepsilon_{LB} = 1/(a-1)$) | Most conservative; worst-case scenario |
+| **Greenhouse–Geisser** (GG) | Estimated from data; best balance of Type I control and power. **Recommended default.** |
+| **Huynh–Feldt** (HF) | Less conservative than GG |
+
+The `afex` package reports corrections automatically.
+
+### The study
+
+A clinical psychologist wants to evaluate whether anxiety symptoms decrease during an 8-week CBT program. Sixteen patients complete a standardized anxiety measure at three time points: **before treatment (Pre)**, **at 4 weeks (Week4)**, and **at 8 weeks (Week8)**.
+
+This is a **one-way within-subjects design**:
+
+- **Within-subjects factor:** Time (3 levels)
+- **DV:** Anxiety score
+- **Random factor:** Patient (the 16 patients represent a broader population)
+
+### Examine the data
+
+The data are already loaded in a data frame called `anxiety`. Take a look:
+
+```{r examine-data, exercise=TRUE}
+head(anxiety, 9)
+str(anxiety)
+```
+
+Notice the data are in **long format** — one row per person per time point. This is what `aov_ez()` expects. 
+
+### Wide format practice
+
+In practice, you'll often receive data in **wide format** (one row per person, one column per condition). The wide version is also available as `anxiety_wide`:
+
+```{r examine-wide, exercise=TRUE}
+head(anxiety_wide)
+```
+
+### Reshaping from wide to long
+
+In your own work, you'll typically need to reshape. Practice converting `anxiety_wide` back to long format using `pivot_longer()`. Fill in the blanks:
+
+```{r reshape-exercise, exercise=TRUE}
+anxiety_long <- anxiety_wide |>
+  pivot_longer(
+    cols      = ___,       # columns to "stack" into rows (exclude ID)
+    names_to  = "___",     # name for the new column holding condition labels
+    values_to = "___"      # name for the new column holding the scores
+  )
+
+head(anxiety_long)
+```
+
+```{r reshape-exercise-hint-1}
+# cols: which columns get stacked into rows? Use -ID to select everything except the subject identifier
+# names_to: what should the new factor column be called? (the within-subjects factor)
+# values_to: what should the new score column be called? (the dependent variable)
+```
+
+```{r reshape-exercise-solution}
+anxiety_long <- anxiety_wide |>
+  pivot_longer(
+    cols      = c("Pre", "Week4", "Week8"),
+    names_to  = "Time",
+    values_to = "Anxiety"
+  )
+
+head(anxiety_long)
+```
+
+### Running the ANOVA
+
+Now run a within-subjects ANOVA on the `anxiety` data using `aov_ez()`. Remember the key arguments:
+
+```{r run-anova, exercise=TRUE}
+anx_res <- aov_ez(
+  id     = "___",     # column that identifies each subject
+  dv     = "___",     # column containing the outcome scores
+  within = "___",     # column(s) for the within-subjects factor
+  data   = anxiety
+)
+
+summary(anx_res)
+```
+
+```{r run-anova-hint-1}
+# id = "ID", dv = "Anxiety", within = "Time"
+```
+
+```{r run-anova-solution}
+anx_res <- aov_ez(
+  id     = "ID",
+  dv     = "Anxiety",
+  within = "Time",
+  data   = anxiety
+)
+
+summary(anx_res)
+```
+
+### Interpreting the output
+
+The `summary()` output has three sections:
+
+1. **"Assuming Sphericity"** — the uncorrected $F$-test
+2. **Mauchly's test** — a test of the sphericity assumption (but underpowered with small samples)
+3. **GG and HF corrections** — the epsilon-corrected $p$-values
+
+Look at the GG epsilon ($\hat{\varepsilon}_{GG}$) and the corrected $p$-value — this is what you would report.
+
+```{r quiz-sphericity, echo=FALSE}
+quiz(
+  caption = "Interpreting the sphericity output",
+  question("What does the Greenhouse-Geisser (GG) epsilon value represent?",
+    answer("The p-value for the sphericity test"),
+    answer("A measure of how far the data depart from sphericity, used to correct the degrees of freedom", correct = TRUE),
+    answer("The effect size for the within-subjects factor"),
+    answer("The correlation between adjacent time points"),
+    allow_retry = TRUE
+  ),
+  question("If the GG epsilon is 0.85, what happens to the degrees of freedom?",
+    answer("They are multiplied by 0.85, making them smaller and the test more conservative", correct = TRUE),
+    answer("They are divided by 0.85, making them larger"),
+    answer("Nothing changes — epsilon only affects the F-statistic"),
+    answer("The degrees of freedom are set to 1"),
+    allow_retry = TRUE
+  ),
+  question("When should you report the GG-corrected p-value instead of the uncorrected one?",
+    answer("Only when Mauchly's test is significant"),
+    answer("Only when there are more than 5 levels of the within-subjects factor"),
+    answer("Always — it is the safest default for within-subjects tests with 3+ levels", correct = TRUE),
+    answer("Only when the uncorrected test is non-significant"),
+    allow_retry = TRUE
+  )
+)
+```
+
+
+## Section 2: Follow-Up Tests
+
+### Why follow-up tests?
+
+If the omnibus $F$-test is significant, it tells us that **at least one** pair of time points differs — but not *which* ones. Follow-up tests let us localize the effect.
+
+We use the `emmeans` package, which you've used before for between-subjects designs. The logic is the same here: we want to estimate the mean of the DV at each level of the within-subjects factor, then compare them. These **estimated marginal means** give us the pattern of differences across the fixed factor — for example, whether anxiety is declining from Pre to Week4 to Week8, and which specific transitions are significant.
+
+The syntax is nearly identical to what you used for between-subjects designs.
+
+### Estimated marginal means
+
+Use `emmeans()` to get the estimated marginal means for each level of Time:
+
+```{r emm-means, exercise=TRUE}
+anx_res <- aov_ez(id = "ID", dv = "Anxiety", within = "Time", data = anxiety)
+
+emmeans(anx_res, ~ Time)
+```
+
+### Pairwise comparisons
+
+Now request all pairwise comparisons. The `pairwise` keyword tells `emmeans` to compare every pair of levels:
+
+```{r pairwise, exercise=TRUE}
+anx_res <- aov_ez(id = "ID", dv = "Anxiety", within = "Time", data = anxiety)
+
+emmeans(anx_res, pairwise ~ Time)
+```
+
+The output has two parts: `$emmeans` (the means) and `$contrasts` (the pairwise differences). The contrasts table shows the estimated mean difference, SE, $t$-ratio, and Tukey-adjusted $p$-value.
+
+### Visualizing the results
+
+The `afex_plot()` function produces a plot suited for within-subjects data. It removes between-subject variability from the error bars so they reflect **within-subject** precision:
+
+```{r plot-results, exercise=TRUE, fig.width=6, fig.height=4}
+anx_res <- aov_ez(id = "ID", dv = "Anxiety", within = "Time", data = anxiety)
+
+afex_plot(anx_res, x = "Time") +
+  labs(y = "Anxiety Score",
+       title = "Anxiety Across Treatment") 
+```
+
+### Practice: full workflow
+
+Now put it all together on your own. Using the `anxiety` data:
+
+1. Run the ANOVA
+2. Check the GG-corrected result
+3. Get pairwise comparisons
+4. Make a plot
+
+```{r full-workflow, exercise=TRUE, exercise.lines=20, fig.width=6, fig.height=4}
+# 1. Run the ANOVA
+anx_res <- aov_ez(id = "ID", dv = "Anxiety", within = "Time", data = anxiety)
+
+# 2. Check the full output (look at GG correction)
+summary(anx_res)
+
+# 3. Pairwise comparisons
+
+
+# 4. Plot
+
+```
+
+```{r full-workflow-solution, fig.width=6, fig.height=4}
+# 1. Run the ANOVA
+anx_res <- aov_ez(id = "ID", dv = "Anxiety", within = "Time", data = anxiety)
+
+# 2. Check the full output (look at GG correction)
+summary(anx_res)
+
+# 3. Pairwise comparisons
+emmeans(anx_res, pairwise ~ Time)
+
+# 4. Plot
+afex_plot(anx_res, x = "Time") +
+  labs(y = "Anxiety Score",
+       title = "Anxiety Across Treatment") +
+  theme_bw()
+```
+
+
+## Section 3: Two Within-Subjects Factors
+
+### A new kind of design
+
+So far, we've had **one** within-subjects factor and the random subject factor. What happens when a study has **two** manipulated within-subjects factors?
+
+This is called an $A \times B \times S$ design:
+
+- $A$ and $B$ are fixed factors (all subjects experience all levels of both)
+- $S$ is the subject factor (random)
+
+This is essentially the **three-way factorial** from Chapter 8, but one of the factors is Subject.
+
+### Example: letter perception
+
+A study of visual interference in letter perception:
+
+- **Factor A — Noise:** the target letter is shown *alone* or *embedded among other letters* (2 levels: Absent, Present)
+- **Factor B — Angle:** the letter is at the center, 4° off-center, or 8° off-center (3 levels: 0, 4, 8)
+- **DV:** Reaction time (ms)
+- Each of 10 subjects completes all 6 conditions (2 × 3 = 6 cells)
+
+### Examine the data
+
+The data are pre-loaded as `C12T1_long`. Take a look:
+
+```{r examine-two-within, exercise=TRUE}
+head(C12T1_long, 12)
+
+# How many observations per subject?
+C12T1_long |> count(ID) 
+```
+
+Notice: each subject has **6 rows** — one for every combination of Noise × Angle. This is the hallmark of a fully crossed within-subjects design.
+
+### The model
+
+The full model is:
+
+$$Y_{ijk} = \mu + \alpha_j + \beta_k + \pi_i + (\alpha\beta)_{jk} + (\alpha\pi)_{ji} + (\beta\pi)_{ki} + (\alpha\beta\pi)_{jik} + \varepsilon_{ijk}$$
+
+This looks complicated, but the logic is the same as before:
+
+- Three main effects (Noise, Angle, Subject)
+- Three two-way interactions
+- One three-way interaction
+
+The key difference: there are now **three** error terms, one for each fixed effect and their interaction:
+
+| Effect | Error term |
+|:--|:--|
+| $A$ (Noise) | $A \times S$ |
+| $B$ (Angle) | $B \times S$ |
+| $A \times B$ | $A \times B \times S$ |
+
+And since there are multiple error terms, there can be **separate sphericity violations** for each.
+
+### Running the ANOVA
+
+With `aov_ez()`, the only change is specifying **both** within-subjects factors in a vector:
+
+```{r two-within-anova, exercise=TRUE}
+two_within_res <- aov_ez(
+  id     = "ID",
+  dv     = "RT",
+  within = c("Noise", "Angle"),
+  data   = C12T1_long
+)
+
+summary(two_within_res)
+```
+
+```{r quiz-two-within, echo=FALSE}
+quiz(
+  caption = "Two within-subjects factors",
+  question("In the output, why does Noise not have a sphericity correction listed?",
+    answer("Noise violates sphericity too severely to correct"),
+    answer("Noise has only 2 levels, so sphericity is automatically satisfied", correct = TRUE),
+    answer("afex doesn't compute corrections for the first factor listed"),
+    answer("The correction is hidden in the summary output"),
+    allow_retry = TRUE
+  ),
+  question("How does aov_ez() know to use separate error terms for each effect?",
+    answer("You have to specify them manually in an Error() term"),
+    answer("It uses the same error term for everything"),
+    answer("It automatically uses the interaction of each effect with the subject factor", correct = TRUE),
+    answer("You need to run three separate ANOVAs"),
+    allow_retry = TRUE
+  )
+)
+```
+
+### Follow-up tests: simple main effects
+
+When a two-way interaction is significant, we investigate **simple main effects** — the effect of one factor within each level of the other. Use the `by` argument in `joint_tests()`:
+
+```{r simple-effects, exercise=TRUE}
+# Effect of Angle within each level of Noise
+joint_tests(two_within_res, by = "Noise")
+```
+
+```{r simple-effects-2, exercise=TRUE}
+# Effect of Noise within each level of Angle
+joint_tests(two_within_res, by = "Angle")
+```
+
+### Follow-up tests: pairwise comparisons
+
+For the pairwise means, use `emmeans` with the `|` (conditioned on) syntax:
+
+```{r pairwise-two-within, exercise=TRUE}
+# Pairwise comparisons of Angle within each Noise condition
+emmeans(two_within_res, pairwise ~ Angle | Noise)
+
+# Pairwise comparisons of Noise within each Angle condition
+emmeans(two_within_res, pairwise ~ Noise | Angle)
+```
+
+### Visualizing the interaction
+
+```{r plot-two-within, exercise=TRUE, fig.width=7, fig.height=4.5}
+afex_plot(two_within_res, x = "Angle", trace = "Noise") +
+  labs(y = "Reaction Time (ms)",
+       x = "Angle (degrees off-center)",
+       title = "Noise × Angle Interaction") +
+  theme_bw()
+```
+
+The `trace` argument specifies which factor to use as separate lines/colors — useful for visualizing interactions.
+
+### Your turn
+
+Try reversing the axes: put Noise on the x-axis and use Angle as the trace variable. Which version makes the pattern easier to see?
+
+```{r plot-reverse, exercise=TRUE, fig.width=7, fig.height=4.5}
+# Your code here: afex_plot with x = "Noise", trace = "Angle"
+
+```
+
+```{r plot-reverse-solution, fig.width=7, fig.height=4.5}
+afex_plot(two_within_res, x = "Noise", trace = "Angle") +
+  labs(y = "Reaction Time (ms)",
+       title = "Angle × Noise Interaction") +
+  theme_bw()
+```
+
+
+## Section 4: Split-Plot Designs
+
+### Mixing between and within factors
+
+A very common design in psychology: one factor is **between-subjects** (e.g., treatment group) and one is **within-subjects** (e.g., time).
+
+This is called a **split-plot design** (or mixed factorial — not to be confused with "mixed model").
+
+**Examples:**
+
+- Treatment vs. control groups measured at pre, post, and follow-up
+- Age groups (young vs. old) performing tasks under multiple conditions
+- Clinical vs. non-clinical samples completing several assessments
+
+### Example: age and letter perception
+
+Modify the letter perception study: instead of Noise as a second within-subjects factor, consider **Age Group** (Young vs. Old) as a between-subjects factor, with the Angle manipulation remaining within-subjects.
+
+- **Between-subjects factor:** Age (Young, Old)
+- **Within-subjects factor:** Angle (0°, 4°, 8°)
+- **DV:** Reaction time
+
+### Examine the data
+
+The split-plot data are pre-loaded as `SplitPlot`:
+
+```{r examine-split, exercise=TRUE}
+head(SplitPlot, 9)
+
+# Check the design structure
+SplitPlot |> 
+  group_by(Age) |> 
+  summarize(
+    n_subjects = n_distinct(ID),
+    n_obs = n()
+  )
+```
+
+Notice: each subject appears in **only one** level of Age (between-subjects) but in **all three** levels of Angle (within-subjects).
+
+### The model
+
+The split-plot model drops terms that can't be estimated when a factor is between-subjects:
+
+$$Y_{ijk} = \mu + \alpha_j + \beta_k + \pi_{i(j)} + (\alpha\beta)_{jk} + (\beta\pi)_{k,i(j)} + \varepsilon_{ijk}$$
+
+Key notation: $\pi_{i(j)}$ means subject $i$ **nested within** level $j$ of the between-subjects factor. Each person belongs to only one age group.
+
+The error terms differ from the two-within case:
+
+| Effect | Error term |
+|:--|:--|
+| $A$ (Age, between) | $S / A$ (subjects within Age groups) |
+| $B$ (Angle, within) | $B \times S / A$ |
+| $A \times B$ | $B \times S / A$ |
+
+### Running the split-plot ANOVA
+
+With `aov_ez()`, you simply specify which factors are `between` and which are `within`:
+
+```{r split-anova, exercise=TRUE}
+split_res <- aov_ez(
+  id      = "ID",        # column identifying each subject
+  dv      = "RT",        # outcome variable
+  between = "Age",       # factor where each subject is in only one group
+  within  = "Angle",     # factor where each subject experiences all levels
+  data    = SplitPlot
+)
+
+summary(split_res)
+```
+
+The syntax directly mirrors how you think about the design: "Age is between-subjects, Angle is within-subjects."
+
+### Examining the output
+
+```{r quiz-split, echo=FALSE}
+quiz(
+  caption = "Split-plot designs",
+  question("In the split-plot output, which effect uses a different error term from the others?",
+    answer("Angle"),
+    answer("Age", correct = TRUE),
+    answer("Age:Angle"),
+    answer("They all use the same error term"),
+    allow_retry = TRUE,
+    message = "The between-subjects effect (Age) is tested against the variability of subjects within age groups (S/A), while the within-subjects effects (Angle and Age:Angle) are tested against the Angle × S/A interaction."
+  ),
+  question("Why doesn't the between-subjects factor (Age) need a sphericity correction?",
+    answer("It has only 2 levels"),
+    answer("Sphericity only applies to within-subjects factors — each person contributes one score per level of the between-subjects factor, so there are no repeated measurements to correlate", correct = TRUE),
+    answer("The correction is applied automatically but not shown"),
+    answer("Between-subjects factors are always more robust"),
+    allow_retry = TRUE
+  )
+)
+```
+
+### Follow-up tests for split-plot designs
+
+The follow-up syntax is the same as for two within-subjects factors:
+
+```{r split-followups, exercise=TRUE}
+split_res <- aov_ez(
+  id = "ID", dv = "RT",
+  between = "Age", within = "Angle",
+  data = SplitPlot
+)
+
+# Simple main effects: Angle within each Age group
+joint_tests(split_res, by = "Age")
+
+# Simple main effects: Age within each Angle
+joint_tests(split_res, by = "Angle")
+```
+
+###
+
+The ominbus effects were significant for angle within both age groups and for age within angle 8. Simple pairwise comparisons give us the final piece of the puzzle to interpret these results:
+
+```{r split-followups2, exercise=TRUE}
+emmeans(split_res, pairwise ~ Angle | Age) # look at both levels of Age
+
+emmeans(split_res, pairwise ~ Age | Angle) # angle8 only
+```
+
+The Angle8 significance test will the identical to the omnibus part from `joint_tests()` because there are only 2 levels of Age. We can still take this step to get direct estimates for the pairwise comparison and mean differences, though. 
+
+### Visualize the interaction
+
+```{r plot-split, exercise=TRUE, fig.width=7, fig.height=4.5}
+split_res <- aov_ez(
+  id = "ID", dv = "RT",
+  between = "Age", within = "Angle",
+  data = SplitPlot
+)
+
+afex_plot(split_res, x = "Angle", trace = "Age") +
+  labs(y = "Reaction Time (ms)",
+       x = "Angle (degrees off-center)",
+       title = "Age × Angle Interaction") +
+  theme_bw()
+```
+
+### Practice: write the call yourself
+
+A researcher studies the effect of a new medication on pain ratings. Patients are randomized to **Drug** (Active, Placebo) — a between-subjects factor — and rated their pain at three time points (**Baseline, Week2, Week4**) — a within-subjects factor. The data frame is called `pain_data` with columns `PatientID`, `Drug`, `Timepoint`, and `Pain`.
+
+Write the `aov_ez()` call that would analyze this design. (You don't need to run it — just write the correct syntax.)
+
+```{r write-call, exercise=TRUE}
+# Write the aov_ez() call for this split-plot design
+pain_res <- aov_ez(
+  id      = "___",     # column identifying each patient
+  dv      = "___",     # column with the outcome measure
+  between = "___",     # factor where patients are in one group only
+  within  = "___",     # factor where patients are measured repeatedly
+  data    = pain_data
+)
+```
+
+```{r write-call-solution}
+pain_res <- aov_ez(
+  id      = "PatientID",
+  dv      = "Pain",
+  between = "Drug",
+  within  = "Timepoint",
+  data    = pain_data
+)
+```
+
+### Summary: comparing the three designs
+
+```{r quiz-final, echo=FALSE}
+quiz(
+  caption = "Design comparison",
+  question("Match the design to the correct `aov_ez()` specification. A study measures 20 subjects on a task under 4 noise conditions and 3 lighting conditions. All subjects experience all conditions. What arguments do you use?",
+    answer('within = c("Noise", "Lighting")', correct = TRUE),
+    answer('between = "Noise", within = "Lighting"'),
+    answer('within = "Noise", between = "Lighting"'),
+    answer('between = c("Noise", "Lighting")'),
+    allow_retry = TRUE
+  ),
+  question("A study compares 3 therapy types (each patient receives one type) across 5 weekly sessions. What kind of design is this?",
+    answer("One-way within-subjects"),
+    answer("Two within-subjects factors"),
+    answer("Split-plot: therapy is between, session is within", correct = TRUE),
+    answer("Two between-subjects factors"),
+    allow_retry = TRUE
+  ),
+  question("In a split-plot design, sphericity corrections apply to:",
+    answer("The between-subjects factor only"),
+    answer("Both factors equally"),
+    answer("The within-subjects factor and its interaction with the between-subjects factor", correct = TRUE),
+    answer("Neither factor — split-plot designs don't need corrections"),
+    allow_retry = TRUE
+  )
+)
+```
+
+
+## Wrap-Up
+
+### What you've learned
+
+In this tutorial you practiced:
+
+1. **One-way within-subjects ANOVA:** reshaping data, running `aov_ez()` with `within`, checking sphericity corrections
+2. **Follow-up tests:** `emmeans()` for means at each level, `pairwise ~` for comparisons, `afex_plot()` for visualization
+3. **Two within-subjects factors:** extending `aov_ez()` with `within = c(...)`, understanding separate error terms and sphericity assessments, using `joint_tests()` with `by` for simple effects
+4. **Split-plot designs:** specifying `between` and `within` arguments, understanding how the error terms differ, follow-up strategies
+
+### The key `aov_ez()` patterns
+
+| Design | Syntax |
+|:--|:--|
+| One-way within | `aov_ez(id, dv, within = "A", data)` |
+| Two within | `aov_ez(id, dv, within = c("A", "B"), data)` |
+| Split-plot | `aov_ez(id, dv, between = "A", within = "B", data)` |
+
+Follow-ups always work the same way regardless of design:
+
+- `emmeans(res, ~ A)` for marginal means
+- `emmeans(res, pairwise ~ A | B)` for pairwise comparisons within levels
+- `joint_tests(res, by = "B")` for simple main effects
+- `afex_plot(res, x = "A", trace = "B")` for interaction plots
+
