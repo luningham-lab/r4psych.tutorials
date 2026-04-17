@@ -21,6 +21,7 @@ library(afex)
 library(emmeans)
 library(ggplot2)
 library(AMCP)
+library(tutorial.helpers)
 
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 
@@ -83,6 +84,9 @@ split_res <- aov_ez(
 )
 ```
 
+
+```{r info-section, child = system.file("child_documents/info_section.Rmd", package = "tutorial.helpers")}
+```
 
 ## Welcome
 
@@ -712,3 +716,5 @@ Follow-ups always work the same way regardless of design:
 - `joint_tests(res, by = "B")` for simple main effects
 - `afex_plot(res, x = "A", trace = "B")` for interaction plots
 
+```{r download-answers, child = system.file("child_documents/download_answers.Rmd", package = "tutorial.helpers")}
+```
